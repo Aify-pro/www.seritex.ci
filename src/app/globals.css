@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+/*
+ * Seritex — « Atelier Signal »
+ * Les trois couleurs viennent du logo (indigo, orange, rouge) ; le fond
+ * rappelle une toile écrue. Bordures franches, ombres décalées (esprit
+ * Bauhaus / affiche), étiquettes en police mono (comme nos étiquettes
+ * de production).
+ */
+:root {
+  --ink: #15163a; /* texte principal */
+  --indigo: #2a2d7c; /* couleur du logo */
+  --indigo-deep: #1b1d5c;
+  --orange: #f28c1b;
+  --rouge: #e2162d;
+  --ecru: #f6f1e6; /* fond « toile » */
+  --ecru-dark: #ebe3d1;
+  --paper: #fffdf8;
+  --muted: #4c4d6b; /* texte secondaire, > 7:1 sur écru */
+
+  --shadow-hard: 6px 6px 0 0 var(--ink);
+  --shadow-hard-sm: 3px 3px 0 0 var(--ink);
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-indigo: var(--indigo);
+  --color-indigo-deep: var(--indigo-deep);
+  --color-orange: var(--orange);
+  --color-rouge: var(--rouge);
+  --color-ecru: var(--ecru);
+  --color-ecru-dark: var(--ecru-dark);
+  --color-paper: var(--paper);
+  --color-muted: var(--muted);
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-outfit);
+  --font-mono: var(--font-mono-jb);
+
+  --shadow-hard: var(--shadow-hard);
+  --shadow-hard-sm: var(--shadow-hard-sm);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--ecru);
+  color: var(--ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--orange);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--rouge);
+  outline-offset: 3px;
+}
+
+/* Grain de toile très léger */
+.bg-toile {
+  background-color: var(--ecru);
+  background-image:
+    repeating-linear-gradient(0deg, rgb(21 22 58 / 0.03) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgb(21 22 58 / 0.03) 0 1px, transparent 1px 4px);
+}
+
+/* Points de couture : trait pointillé */
+.couture {
+  height: 2px;
+  background-image: linear-gradient(90deg, currentColor 55%, transparent 0);
+  background-size: 14px 2px;
+  background-repeat: repeat-x;
+}
+.couture-v {
+  width: 2px;
+  background-image: linear-gradient(180deg, currentColor 55%, transparent 0);
+  background-size: 2px 14px;
+  background-repeat: repeat-y;
+}
+
+/* Étiquette textile (encoche à gauche) */
+.etiquette {
+  clip-path: polygon(12px 0, 100% 0, 100% 100%, 12px 100%, 0 50%);
+}
+
+/* Bouton « presse » : se soulève au survol, s'enfonce au clic */
+.btn-presse {
+  box-shadow: var(--shadow-hard-sm);
+  transition:
+    transform 160ms ease-out,
+    box-shadow 160ms ease-out,
+    background-color 160ms ease-out;
+}
+.btn-presse:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0 0 var(--ink);
+}
+.btn-presse:active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 0 var(--ink);
+}
+
+/* Bandeau défilant (clients) */
+@keyframes defile {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.defile {
+  animation: defile 45s linear infinite;
+}
+.defile-zone:hover .defile,
+.defile-zone:focus-within .defile,
+.defile-zone[data-paused="true"] .defile {
+  animation-play-state: paused;
+}
+
+/* Fil qui se coud dans le hero */
+@keyframes coudre {
+  from {
+    stroke-dashoffset: 2400;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.fil-anime {
+  stroke-dasharray: 2400;
+  animation: coudre 2.6s cubic-bezier(0.65, 0, 0.35, 1) 0.2s both;
+}
+
+/* Apparition au défilement (pilotée par <Reveal>) */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--delay, 0ms);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .defile,
+  .fil-anime {
+    animation: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .btn-presse,
+  .btn-presse:hover,
+  .btn-presse:active {
+    transition: none;
+    transform: none;
+  }
+}
