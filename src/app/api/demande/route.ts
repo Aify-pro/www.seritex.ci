@@ -1,8 +1,10 @@
-import { validateDemande } from "@/lib/demande";
+import { produits, techniquesChoix, validateDemande } from "@/lib/demande";
 
 /**
- * Reçoit une demande de devis du site et l'enregistre dans la base Supabase
- * de l'application Seritex (table `site_leads`, voir supabase/site_leads.sql).
+ * Reçoit une demande de devis du site et la crée dans la plateforme Seritex
+ * (fonction SQL `create_site_request`, migration 0094 de l'application) :
+ *   - client reconnu par son e-mail → demande rattachée à sa fiche ;
+ *   - sinon → demande « Client à rattacher » pour les commerciaux.
  * La clé « service role » ne quitte jamais le serveur.
  */
 export async function POST(request: Request) {
@@ -33,36 +35,43 @@ export async function POST(request: Request) {
     );
   }
 
-  const res = await fetch(`${url}/rest/v1/site_leads`, {
+  const res = await fetch(`${url}/rest/v1/rpc/create_site_request`, {
     method: "POST",
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      Prefer: "return=minimal",
     },
     body: JSON.stringify({
-      contact_name: data.nom,
-      company_name: data.entreprise || null,
-      email: data.email,
-      phone: data.telephone,
-      product_family: data.produit,
-      technique: data.technique,
-      quantity: data.quantite,
-      wanted_date: data.delai || null,
-      message: data.message || null,
-      source: "site",
-      user_agent: request.headers.get("user-agent")?.slice(0, 300) ?? null,
+      p: {
+        nom: data.nom,
+        entreprise: data.entreprise,
+        email: data.email,
+        telephone: data.telephone,
+        produit_libelle: produits.find((p) => p.value === data.produit)?.label ?? data.produit,
+        technique_libelle: techniquesChoix.find((t) => t.value === data.technique)?.label ?? data.technique,
+        quantite: String(data.quantite),
+        date_souhaitee: data.delai,
+        message: data.message,
+      },
     }),
   });
 
   if (!res.ok) {
-    console.error("[demande] insertion Supabase échouée", res.status, await res.text());
+    const detail = await res.text();
+    console.error("[demande] création échouée", res.status, detail);
+    if (detail.includes("trop de demandes")) {
+      return Response.json(
+        { ok: false, message: "Vous avez déjà envoyé plusieurs demandes. Nous revenons vers vous rapidement." },
+        { status: 429 },
+      );
+    }
     return Response.json(
       { ok: false, message: "Envoi impossible pour le moment. Réessayez ou écrivez-nous à info@seritex.ci." },
       { status: 502 },
     );
   }
 
-  return Response.json({ ok: true });
+  const created = (await res.json()) as { reference?: string };
+  return Response.json({ ok: true, reference: created.reference ?? null });
 }

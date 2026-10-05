@@ -4,7 +4,11 @@ import { useState, type FormEvent } from "react";
 import { ArrowRight, CheckCircle2, Lightbulb, Loader2 } from "lucide-react";
 import { produits, suggestTechnique, techniquesChoix, type DemandeErrors } from "@/lib/demande";
 
-type Status = { kind: "idle" } | { kind: "sending" } | { kind: "sent" } | { kind: "error"; message: string };
+type Status =
+  | { kind: "idle" }
+  | { kind: "sending" }
+  | { kind: "sent"; reference: string | null }
+  | { kind: "error"; message: string };
 
 const inputCls =
   "mt-2 block min-h-12 w-full border-2 border-ink bg-paper px-4 py-3 text-base text-ink placeholder:text-muted/70 focus:border-indigo focus:outline-none aria-[invalid=true]:border-rouge";
@@ -64,7 +68,7 @@ export function DevisForm({ defaultProduit = "" }: { defaultProduit?: string }) 
       });
       const json = await res.json();
       if (res.ok && json.ok) {
-        setStatus({ kind: "sent" });
+        setStatus({ kind: "sent", reference: json.reference ?? null });
         form.reset();
         return;
       }
@@ -86,6 +90,9 @@ export function DevisForm({ defaultProduit = "" }: { defaultProduit?: string }) 
       <div className="border-2 border-ink bg-paper p-8 shadow-hard" role="status">
         <CheckCircle2 aria-hidden className="text-indigo" size={48} />
         <h2 className="mt-4 font-display text-3xl font-black">Demande bien reçue.</h2>
+        {status.reference ? (
+          <p className="mt-2 font-mono text-sm tracking-widest text-rouge uppercase">Référence {status.reference}</p>
+        ) : null}
         <p className="mt-3 text-lg text-muted">
           Un conseiller Seritex vous recontacte pour établir votre devis. Gardez votre logo sous la main : il vous le
           demandera pour préparer le BAT.
