@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Outfit } from "next/font/google";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { ScrollEffects } from "@/components/scroll-effects";
 import { site } from "@/content/site";
 import "./globals.css";
 
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="fr" className={`${outfit.variable} ${inter.variable} ${mono.variable}`}>
       <body className="flex min-h-dvh flex-col">
         <Header />
+        <ScrollEffects />
         <main id="contenu" className="flex-1">
           {children}
         </main>

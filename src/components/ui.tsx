@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
+import { Reveal } from "./reveal";
 
 type Variant = "primary" | "orange" | "ghost" | "paper";
 
@@ -64,13 +65,14 @@ export function SectionTitle({
   className?: string;
 }) {
   return (
-    <div className={`max-w-3xl ${className}`}>
+    <Reveal className={`max-w-3xl ${className}`}>
       <Etiquette>{label}</Etiquette>
       <h2 className="mt-5 font-display text-4xl leading-[0.95] font-black tracking-tight text-balance sm:text-5xl lg:text-6xl">
         {title}
       </h2>
+      <span aria-hidden className="couture couture-trace mt-5 block w-40 text-rouge" />
       {intro ? <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted">{intro}</p> : null}
-    </div>
+    </Reveal>
   );
 }
 

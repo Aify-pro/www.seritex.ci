@@ -31,6 +31,7 @@ export const site = {
 } as const;
 
 export const nav = [
+  { href: "/", label: "Accueil" },
   { href: "/savoir-faire", label: "Savoir-faire" },
   { href: "/techniques", label: "Techniques" },
   { href: "/produits", label: "Produits" },
