@@ -1,29 +1,18 @@
 "use client";
 
-import Image from "next/image";
-import {
-  couleursProposees,
-  grammagesProposes,
-  MENTION_INDISPONIBLE,
-  photoPour,
-  type ModeleCatalogue,
-} from "@/lib/catalogue-plateforme";
-import { Apercu, formePour } from "./apercu";
+import { couleursProposees, grammagesProposes, MENTION_INDISPONIBLE, type ModeleCatalogue } from "@/lib/catalogue-plateforme";
 import type { Configuration } from "./etat";
 import { quantiteTotale } from "./etat";
 import { Pastille, Puce, Titre } from "./ui";
 
+/** Étape 1 de la fiche article : couleur, qualité du tissu, quantité. */
 export function EtapeArticle({
-  catalogue,
   modele,
   config,
-  choisirModele,
   modifier,
 }: {
-  catalogue: ModeleCatalogue[];
   modele: ModeleCatalogue;
   config: Configuration;
-  choisirModele: (m: ModeleCatalogue) => void;
   modifier: (patch: Partial<Configuration>) => void;
 }) {
   const couleurs = couleursProposees(modele);
@@ -33,46 +22,6 @@ export function EtapeArticle({
 
   return (
     <div className="space-y-8">
-      <div>
-        <Titre>Quel article ?</Titre>
-        <p className="mt-1 text-muted">Les modèles du catalogue Seritex, confectionnés dans nos ateliers.</p>
-        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {catalogue.map((m) => {
-            const indispo = m.statut === "indisponible";
-            const choisi = m.id === modele.id;
-            const photo = photoPour(m, null);
-            return (
-              <li key={m.id}>
-                <button
-                  type="button"
-                  disabled={indispo}
-                  aria-pressed={choisi}
-                  onClick={() => choisirModele(m)}
-                  className={`flex h-full w-full flex-col border-2 border-ink p-2 text-left transition ${
-                    choisi ? "bg-indigo text-white shadow-hard-sm" : "bg-paper hover:-translate-y-0.5"
-                  } disabled:cursor-not-allowed disabled:opacity-60`}
-                >
-                  <span className="relative block aspect-square w-full overflow-hidden bg-ecru">
-                    {photo ? (
-                      <Image src={photo} alt="" fill sizes="200px" className="object-cover" unoptimized />
-                    ) : (
-                      <span className="block p-3">
-                        <Apercu vue="face" couleurHex="#FFFFFF" forme={formePour(m.nom, m.sousFamille)} marquages={[]} />
-                      </span>
-                    )}
-                  </span>
-                  <span className="mt-2 font-display font-bold leading-tight">{m.nom}</span>
-                  <span className={`text-sm ${choisi ? "text-white/80" : "text-muted"}`}>
-                    {indispo ? MENTION_INDISPONIBLE : (m.sousFamille ?? m.famille ?? "")}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        {modele.texteCommercial ? <p className="mt-4 text-muted">{modele.texteCommercial}</p> : null}
-      </div>
-
       <div>
         <Titre>Couleur du textile</Titre>
         {couleurs.length === 0 ? (

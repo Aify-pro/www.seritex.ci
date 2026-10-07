@@ -7,11 +7,11 @@ import { useState } from "react";
 import { Menu, X, LogIn } from "lucide-react";
 import { nav, site } from "@/content/site";
 
-/** `personnaliser` : lien vers l'outil, affiché seulement quand il est activé dans la plateforme. */
-export function Header({ personnaliser = false }: { personnaliser?: boolean }) {
+/** `eshop` : lien vers l'e-shop, affiché seulement quand il est activé dans la plateforme (Paramètres > Site web). */
+export function Header({ eshop = false }: { eshop?: boolean }) {
   const pathname = usePathname();
-  const items: { href: string; label: string }[] = personnaliser
-    ? [...nav.filter((i) => i.href !== "/commander"), { href: "/personnaliser", label: "Personnaliser" }, ...nav.filter((i) => i.href === "/commander")]
+  const items: { href: string; label: string }[] = eshop
+    ? [...nav.filter((i) => i.href !== "/commander"), { href: "/e-shop", label: "E-shop" }, ...nav.filter((i) => i.href === "/commander")]
     : [...nav];
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState(pathname);

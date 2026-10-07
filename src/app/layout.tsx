@@ -30,12 +30,12 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  // Lien « Personnaliser » seulement si l'outil est activé (Paramètres > Site web de la plateforme).
+  // Lien « E-shop » seulement s'il est activé (Paramètres > Site web de la plateforme).
   const reglages = await getReglages();
   return (
     <html lang="fr" className={`${outfit.variable} ${inter.variable} ${mono.variable}`}>
       <body className="flex min-h-dvh flex-col">
-        <Header personnaliser={reglages.personnaliser} />
+        <Header eshop={reglages.eshop} />
         <ScrollEffects />
         <main id="contenu" className="flex-1">
           {children}
