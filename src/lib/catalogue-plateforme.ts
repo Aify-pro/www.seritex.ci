@@ -7,7 +7,7 @@ import { unstable_cache } from "next/cache";
  *
  * SERVEUR UNIQUEMENT : utilise la clé « service role », comme /api/demande.
  * Les photos sont dans un bucket privé ; on les signe ici pour une heure, et
- * le catalogue est remis en cache 5 minutes (les liens restent donc valides).
+ * le catalogue est remis en cache 1 minute (les liens restent donc valides).
  */
 
 export type Disponibilite = "disponible" | "non_suivi" | "indisponible";
@@ -113,7 +113,7 @@ async function chargerCatalogue(): Promise<ModeleCatalogue[]> {
 }
 
 /**
- * Catalogue mis en cache 5 minutes. En cas de panne de la plateforme, renvoie
+ * Catalogue mis en cache 1 minute. En cas de panne de la plateforme, renvoie
  * une liste vide (le site reste en ligne, le formulaire de devis aussi).
  */
 export async function getCatalogue(): Promise<ModeleCatalogue[]> {
@@ -135,7 +135,8 @@ const getCatalogueCache = unstable_cache(
     }
   },
   ["catalogue-plateforme"],
-  { revalidate: 300, tags: ["catalogue"] },
+  // 1 minute : activer l'e-shop ou publier un modèle se voit vite sur le site.
+  { revalidate: 60, tags: ["catalogue"] },
 );
 
 /** Couleurs à proposer : on retire celles dont tout le tissu manque. */
@@ -158,4 +159,12 @@ export function photoPour(m: ModeleCatalogue, couleurId: string | null): string 
     m.medias.find((p) => p.couleurId === null && p.principale) ||
     m.medias[0];
   return pick ? pick.url : null;
+}
+
+/** Adresse d'un article dans l'e-shop : son code (« ts002 »), sinon son identifiant. */
+export const slugModele = (m: Pick<ModeleCatalogue, "code" | "id">) => (m.code ?? m.id).toLowerCase();
+
+export async function trouverModele(slug: string): Promise<ModeleCatalogue | null> {
+  const s = decodeURIComponent(slug).toLowerCase();
+  return (await getCatalogue()).find((m) => slugModele(m) === s) ?? null;
 }

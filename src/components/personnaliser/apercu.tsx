@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useId } from "react";
-import { formatCm, UNITES_PAR_CM, type Placement, type Vue } from "@/lib/marquage";
+import { formatCm, UNITES_PAR_CM, type Forme, type Placement, type Vue } from "@/lib/marquage";
 
 /** Un marquage à dessiner sur la silhouette. */
 export type MarquageApercu = {
@@ -13,11 +13,7 @@ export type MarquageApercu = {
   actif: boolean;
 };
 
-export type Forme = "tshirt" | "polo";
-
-/** Silhouette d'après le nom du modèle (polo reconnu, t-shirt sinon). */
-export const formePour = (nom: string, famille: string | null): Forme =>
-  /polo|piqu/i.test(`${nom} ${famille ?? ""}`) ? "polo" : "tshirt";
+export { formePour, type Forme } from "@/lib/marquage";
 
 const CORPS =
   "M140,40 L70,62 L5,150 L60,185 L100,150 L100,420 L300,420 L300,150 L340,185 L395,150 L330,62 L260,40";

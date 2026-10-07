@@ -72,6 +72,12 @@ export const getTechnique = (id: TechniqueId) => TECHNIQUES.find((t) => t.id ===
 
 export type Vue = "face" | "dos";
 
+export type Forme = "tshirt" | "polo";
+
+/** Silhouette de l'aperçu d'après le nom du modèle (polo reconnu, t-shirt sinon). */
+export const formePour = (nom: string, famille: string | null): Forme =>
+  /polo|piqu/i.test(`${nom} ${famille ?? ""}`) ? "polo" : "tshirt";
+
 /**
  * Position d'un emplacement sur la silhouette (repère 400 × 440, torse de
  * x = 100 à 300 ≈ 52 cm de large), et largeur maximale de marquage.

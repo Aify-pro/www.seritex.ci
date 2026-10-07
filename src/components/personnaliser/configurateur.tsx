@@ -11,11 +11,11 @@ import { EtapeControles } from "./etape-controles";
 import { EtapeEnvoi } from "./etape-envoi";
 import { EtapeMarquage } from "./etape-marquage";
 
-const ETAPES = ["Article", "Marquage", "Contrôles", "Ma maquette"] as const;
+const ETAPES = ["Couleur & quantité", "Logo & emplacement", "Contrôles", "Ma maquette"] as const;
 
-export function Configurateur({ catalogue }: { catalogue: ModeleCatalogue[] }) {
-  const premier = catalogue.find((m) => m.statut !== "indisponible") ?? catalogue[0];
-  const [config, setConfig] = useState<Configuration>(() => configurationInitiale(premier));
+/** Parcours de personnalisation d'un article de l'e-shop (fiche article). */
+export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
+  const [config, setConfig] = useState<Configuration>(() => configurationInitiale(modele));
   const [etape, setEtape] = useState(0);
   const [vue, setVue] = useState<Vue>("face");
   const [actifId, setActifId] = useState(config.marquages[0]?.id ?? "");
@@ -26,7 +26,6 @@ export function Configurateur({ catalogue }: { catalogue: ModeleCatalogue[] }) {
     haut.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  const modele = catalogue.find((m) => m.id === config.modeleId) ?? premier;
   const couleur = modele.couleurs.find((c) => c.id === config.couleurId) ?? null;
   const grammage = modele.grammages.find((g) => g.id === config.grammageId) ?? null;
   const couleurHex = couleur?.hex ?? "#FFFFFF";
@@ -92,18 +91,7 @@ export function Configurateur({ catalogue }: { catalogue: ModeleCatalogue[] }) {
       <div className="mt-8 grid gap-8 lg:grid-cols-12">
         <div className="border-2 border-ink bg-paper p-5 shadow-hard sm:p-8 lg:col-span-7">
           {etape === 0 ? (
-            <EtapeArticle
-              catalogue={catalogue}
-              modele={modele}
-              config={config}
-              modifier={modifier}
-              choisirModele={(m) => {
-                const c = configurationInitiale(m);
-                setConfig({ ...c, quantite: config.quantite });
-                setActifId(c.marquages[0]?.id ?? "");
-                setVue("face");
-              }}
-            />
+            <EtapeArticle modele={modele} config={config} modifier={modifier} />
           ) : etape === 1 ? (
             <EtapeMarquage modele={modele} marquages={config.marquages} actifId={actifId} setActif={setActif} setMarquages={setMarquages} />
           ) : etape === 2 ? (
