@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef, useId } from "react";
 import { formatCm, UNITES_PAR_CM, type Placement, type Vue } from "@/lib/marquage";
 
 /** Un marquage à dessiner sur la silhouette. */
@@ -28,24 +29,18 @@ const clair = (hex: string) => {
   return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) > 150;
 };
 
-export function Apercu({
-  vue,
-  couleurHex,
-  forme,
-  marquages,
-}: {
-  vue: Vue;
-  couleurHex: string;
-  forme: Forme;
-  marquages: MarquageApercu[];
-}) {
+export const Apercu = forwardRef<
+  SVGSVGElement,
+  { vue: Vue; couleurHex: string; forme: Forme; marquages: MarquageApercu[] }
+>(function Apercu({ vue, couleurHex, forme, marquages }, ref) {
+  const gid = `volume-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const trait = clair(couleurHex) ? "rgb(21 22 58 / 0.35)" : "rgb(255 255 255 / 0.25)";
   const visibles = marquages.filter((m) => m.placement.vue === vue);
 
   return (
-    <svg viewBox="0 0 400 440" role="img" aria-label={`Aperçu ${vue === "face" ? "de face" : "de dos"}`} className="h-auto w-full">
+    <svg ref={ref} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 440" role="img" aria-label={`Aperçu ${vue === "face" ? "de face" : "de dos"}`} className="h-auto w-full">
       <defs>
-        <linearGradient id="volume" x1="0" x2="1">
+        <linearGradient id={gid} x1="0" x2="1">
           <stop offset="0" stopColor="#000" stopOpacity="0.14" />
           <stop offset="0.25" stopColor="#000" stopOpacity="0" />
           <stop offset="0.75" stopColor="#000" stopOpacity="0" />
@@ -54,7 +49,7 @@ export function Apercu({
       </defs>
       <ellipse cx="200" cy="428" rx="130" ry="8" fill="rgb(21 22 58 / 0.12)" />
       <path d={`${CORPS} ${vue === "face" ? COL_FACE : COL_DOS} Z`} fill={couleurHex} stroke={trait} strokeWidth="2" strokeLinejoin="round" />
-      <path d={`${CORPS} ${vue === "face" ? COL_FACE : COL_DOS} Z`} fill="url(#volume)" />
+      <path d={`${CORPS} ${vue === "face" ? COL_FACE : COL_DOS} Z`} fill={`url(#${gid})`} />
       {/* Coutures : épaules, bas de manches, ourlet */}
       <g fill="none" stroke={trait} strokeWidth="1.5" strokeDasharray="4 4">
         <path d="M100,150 L70,62 M300,150 L330,62" opacity="0.6" />
@@ -96,4 +91,4 @@ export function Apercu({
       })}
     </svg>
   );
-}
+});

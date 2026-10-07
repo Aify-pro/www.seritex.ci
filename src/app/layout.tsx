@@ -4,6 +4,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { ScrollEffects } from "@/components/scroll-effects";
 import { site } from "@/content/site";
+import { getReglages } from "@/lib/reglages-site";
 import "./globals.css";
 
 const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"], weight: ["500", "600", "700", "800", "900"] });
@@ -28,11 +29,13 @@ export const viewport: Viewport = {
   themeColor: "#2a2d7c",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Lien « Personnaliser » seulement si l'outil est activé (Paramètres > Site web de la plateforme).
+  const reglages = await getReglages();
   return (
     <html lang="fr" className={`${outfit.variable} ${inter.variable} ${mono.variable}`}>
       <body className="flex min-h-dvh flex-col">
-        <Header />
+        <Header personnaliser={reglages.personnaliser} />
         <ScrollEffects />
         <main id="contenu" className="flex-1">
           {children}

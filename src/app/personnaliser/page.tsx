@@ -1,20 +1,30 @@
 import type { Metadata } from "next";
+import { MessageCircle, Phone } from "lucide-react";
 import { Configurateur } from "@/components/personnaliser/configurateur";
 import { ButtonLink, Container, Etiquette } from "@/components/ui";
+import { site } from "@/content/site";
 import { getCatalogue } from "@/lib/catalogue-plateforme";
+import { getReglages, MESSAGE_FERMETURE } from "@/lib/reglages-site";
 
-export const metadata: Metadata = {
-  title: "Personnaliser votre textile",
-  description: "Choisissez l'article, déposez votre logo, placez-le : votre maquette se construit sous vos yeux, puis votre conseiller Seritex établit le devis.",
-  // Page pas encore annoncée (l'envoi arrive au lot suivant).
-  robots: { index: false, follow: false },
-};
+const description =
+  "Choisissez l'article, déposez votre logo, placez-le : votre maquette se construit sous vos yeux, puis votre conseiller Seritex établit le devis.";
 
-// Le catalogue vient de la plateforme (mis en cache 5 minutes) : rendu à la demande.
+export async function generateMetadata(): Promise<Metadata> {
+  const { personnaliser } = await getReglages();
+  return {
+    title: "Personnaliser votre textile",
+    description,
+    // Indexée seulement quand l'outil est ouvert (Paramètres > Site web de la plateforme).
+    robots: personnaliser ? undefined : { index: false, follow: false },
+  };
+}
+
+// Catalogue et interrupteur viennent de la plateforme (mis en cache) : rendu à la demande.
 export const dynamic = "force-dynamic";
 
 export default async function PersonnaliserPage() {
-  const catalogue = await getCatalogue();
+  const reglages = await getReglages();
+  const catalogue = reglages.personnaliser ? await getCatalogue() : [];
 
   return (
     <section className="bg-toile py-12 sm:py-16">
@@ -29,13 +39,23 @@ export default async function PersonnaliserPage() {
         </p>
 
         <div className="mt-10">
-          {catalogue.length === 0 ? (
+          {!reglages.personnaliser || catalogue.length === 0 ? (
             <div className="max-w-2xl border-2 border-ink bg-paper p-8 shadow-hard">
-              <h2 className="font-display text-2xl font-black">Le catalogue en ligne arrive bientôt.</h2>
-              <p className="mt-3 text-muted">En attendant, décrivez votre projet : un conseiller vous recontacte rapidement.</p>
+              <h2 className="font-display text-2xl font-black">
+                {!reglages.personnaliser ? (reglages.message ?? MESSAGE_FERMETURE) : "Le catalogue en ligne arrive bientôt."}
+              </h2>
+              <p className="mt-3 text-muted">Décrivez votre projet : un conseiller vous recontacte rapidement avec un devis.</p>
               <ButtonLink href="/devis" variant="orange" className="mt-6">
                 Demander un devis
               </ButtonLink>
+              <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                <a href={site.contact.whatsappHref} className="inline-flex min-h-11 items-center gap-2 font-semibold hover:text-indigo">
+                  <MessageCircle aria-hidden size={18} className="text-rouge" /> WhatsApp {site.contact.whatsapp}
+                </a>
+                <a href={site.contact.phoneHref} className="inline-flex min-h-11 items-center gap-2 font-semibold hover:text-indigo">
+                  <Phone aria-hidden size={18} className="text-rouge" /> {site.contact.phone}
+                </a>
+              </div>
             </div>
           ) : (
             <Configurateur catalogue={catalogue} />
