@@ -7,8 +7,12 @@ import { useState } from "react";
 import { Menu, X, LogIn } from "lucide-react";
 import { nav, site } from "@/content/site";
 
-export function Header() {
+/** `personnaliser` : lien vers l'outil, affiché seulement quand il est activé dans la plateforme. */
+export function Header({ personnaliser = false }: { personnaliser?: boolean }) {
   const pathname = usePathname();
+  const items: { href: string; label: string }[] = personnaliser
+    ? [...nav.filter((i) => i.href !== "/commander"), { href: "/personnaliser", label: "Personnaliser" }, ...nav.filter((i) => i.href === "/commander")]
+    : [...nav];
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState(pathname);
 
@@ -26,21 +30,21 @@ export function Header() {
       >
         Aller au contenu
       </a>
-      <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-10">
+      <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
         <Link href="/" className="shrink-0" aria-label="Seritex — accueil">
           <Image src="/images/brand/logo-seritex.png" alt="Seritex" width={146} height={48} preload />
         </Link>
 
-        <nav aria-label="Navigation principale" className="hidden lg:block">
+        <nav aria-label="Navigation principale" className="hidden xl:block">
           <ul className="flex items-center gap-1">
-            {nav.map((item) => {
+            {items.map((item) => {
               const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    className={`relative px-3 py-2 font-display text-[15px] font-semibold transition-colors hover:text-rouge ${
+                    className={`relative px-2 py-2 font-display whitespace-nowrap text-[15px] font-semibold transition-colors hover:text-rouge ${
                       active ? "text-rouge" : ""
                     }`}
                   >
@@ -53,17 +57,17 @@ export function Header() {
           </ul>
         </nav>
 
-        <div className="hidden items-center gap-3 lg:flex">
+        <div className="hidden items-center gap-3 xl:flex">
           <a
             href={`${site.appUrl}/login`}
-            className="inline-flex min-h-11 items-center gap-2 px-3 font-display text-sm font-semibold hover:text-indigo"
+            className="inline-flex min-h-11 items-center gap-2 px-3 font-display text-sm font-semibold whitespace-nowrap hover:text-indigo"
           >
             <LogIn aria-hidden size={18} />
             Espace client
           </a>
           <Link
             href="/devis"
-            className="btn-presse inline-flex min-h-11 items-center border-2 border-ink bg-orange px-5 font-display text-sm font-bold"
+            className="btn-presse inline-flex min-h-11 items-center border-2 border-ink bg-orange px-5 font-display text-sm font-bold whitespace-nowrap"
           >
             Demander un devis
           </Link>
@@ -71,7 +75,7 @@ export function Header() {
 
         <button
           type="button"
-          className="inline-flex size-12 items-center justify-center border-2 border-ink bg-paper lg:hidden"
+          className="inline-flex size-12 items-center justify-center border-2 border-ink bg-paper xl:hidden"
           aria-expanded={open}
           aria-controls="menu-mobile"
           aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}
@@ -82,9 +86,9 @@ export function Header() {
       </div>
 
       {open ? (
-        <nav id="menu-mobile" aria-label="Navigation mobile" className="border-t-2 border-ink bg-indigo text-white lg:hidden">
+        <nav id="menu-mobile" aria-label="Navigation mobile" className="border-t-2 border-ink bg-indigo text-white xl:hidden">
           <ul className="px-4 py-4">
-            {nav.map((item) => (
+            {items.map((item) => (
               <li key={item.href} className="border-b border-white/20">
                 <Link href={item.href} className="block py-4 font-display text-2xl font-bold">
                   {item.label}

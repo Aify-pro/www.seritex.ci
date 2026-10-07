@@ -3,15 +3,15 @@
 import { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
-import { formatCm, getTechnique, placementPour, type Vue } from "@/lib/marquage";
+import { placementPour, type Vue } from "@/lib/marquage";
 import { Apercu, formePour, type MarquageApercu } from "./apercu";
 import { configurationInitiale, quantiteTotale, type Configuration, type Marquage } from "./etat";
 import { EtapeArticle } from "./etape-article";
 import { EtapeControles } from "./etape-controles";
-import { EtapeMarquage, libelleEmplacement } from "./etape-marquage";
-import { Titre } from "./ui";
+import { EtapeEnvoi } from "./etape-envoi";
+import { EtapeMarquage } from "./etape-marquage";
 
-const ETAPES = ["Article", "Marquage", "Contrôles", "Récapitulatif"] as const;
+const ETAPES = ["Article", "Marquage", "Contrôles", "Ma maquette"] as const;
 
 export function Configurateur({ catalogue }: { catalogue: ModeleCatalogue[] }) {
   const premier = catalogue.find((m) => m.statut !== "indisponible") ?? catalogue[0];
@@ -109,7 +109,15 @@ export function Configurateur({ catalogue }: { catalogue: ModeleCatalogue[] }) {
           ) : etape === 2 ? (
             <EtapeControles modele={modele} marquages={config.marquages} couleurHex={couleur?.hex ?? null} quantite={total} setMarquages={setMarquages} />
           ) : (
-            <Recapitulatif modele={modele} config={config} couleur={couleur?.nom ?? "—"} grammage={grammage?.grammage ? `${grammage.grammage} g/m²` : (grammage?.nom ?? null)} total={total} />
+            <EtapeEnvoi
+              modele={modele}
+              config={config}
+              couleur={couleur?.nom ?? "—"}
+              couleurHex={couleurHex}
+              grammage={grammage?.grammage ? `${grammage.grammage} g/m²` : (grammage?.nom ?? null)}
+              total={total}
+              apercus={apercus}
+            />
           )}
 
           <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t-2 border-dashed border-ink pt-6">
@@ -186,64 +194,3 @@ export function Configurateur({ catalogue }: { catalogue: ModeleCatalogue[] }) {
   );
 }
 
-function Recapitulatif({
-  modele,
-  config,
-  couleur,
-  grammage,
-  total,
-}: {
-  modele: ModeleCatalogue;
-  config: Configuration;
-  couleur: string;
-  grammage: string | null;
-  total: number;
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <Titre>Récapitulatif</Titre>
-        <p className="mt-1 text-muted">
-          Ce que vous avez composé. Votre conseiller Seritex établit ensuite le devis ; le BAT vous sera soumis avant toute production.
-        </p>
-      </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-2 border-ink bg-ecru p-4 text-sm">
-        <dt className="font-mono text-xs tracking-wider uppercase">Article</dt>
-        <dd className="font-semibold">{modele.nom}</dd>
-        <dt className="font-mono text-xs tracking-wider uppercase">Couleur</dt>
-        <dd>{couleur}</dd>
-        {grammage ? (
-          <>
-            <dt className="font-mono text-xs tracking-wider uppercase">Tissu</dt>
-            <dd>{grammage}</dd>
-          </>
-        ) : null}
-        <dt className="font-mono text-xs tracking-wider uppercase">Quantité</dt>
-        <dd>
-          {total} pièce{total > 1 ? "s" : ""}
-          {config.repartition
-            ? ` (${Object.entries(config.repartition)
-                .filter(([, v]) => Number.parseInt(v, 10) > 0)
-                .map(([k, v]) => `${k} : ${v}`)
-                .join(", ")})`
-            : " — répartition par taille proposée avec le devis"}
-        </dd>
-      </dl>
-      <ul className="space-y-3">
-        {config.marquages.map((m, i) => (
-          <li key={m.id} className="border-2 border-ink p-4 text-sm">
-            <p className="font-display font-bold">
-              Marquage {i + 1} · {libelleEmplacement(modele, m.emplacementId)} · {formatCm(m.largeurCm)} · {getTechnique(m.technique).label}
-            </p>
-            <p className="text-muted">{m.logo ? m.logo.nom : "Logo à transmettre au conseiller"}</p>
-            {m.consigne ? <p className="mt-1">« {m.consigne} »</p> : null}
-          </li>
-        ))}
-      </ul>
-      <p className="border-2 border-dashed border-ink bg-orange/15 p-4 text-sm">
-        <strong className="font-display">Bientôt :</strong> téléchargement de votre maquette et envoi direct à Seritex depuis cette page. En attendant,
-        demandez votre devis par le formulaire en indiquant ce récapitulatif.
-      </p>
-    </div>
-  );
-}
