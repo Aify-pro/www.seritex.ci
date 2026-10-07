@@ -116,7 +116,16 @@ async function chargerCatalogue(): Promise<ModeleCatalogue[]> {
  * Catalogue mis en cache 5 minutes. En cas de panne de la plateforme, renvoie
  * une liste vide (le site reste en ligne, le formulaire de devis aussi).
  */
-export const getCatalogue = unstable_cache(
+export async function getCatalogue(): Promise<ModeleCatalogue[]> {
+  // Développement sans données publiées : catalogue d'exemple (jamais en production).
+  if (process.env.CATALOGUE_EXEMPLE === "1" && process.env.VERCEL_ENV !== "production") {
+    const { catalogueExemple } = await import("@/content/catalogue-exemple");
+    return catalogueExemple;
+  }
+  return getCatalogueCache();
+}
+
+const getCatalogueCache = unstable_cache(
   async (): Promise<ModeleCatalogue[]> => {
     try {
       return await chargerCatalogue();
