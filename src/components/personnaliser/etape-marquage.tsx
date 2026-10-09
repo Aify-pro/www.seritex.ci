@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState, type DragEvent } from "react";
-import { FileImage, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { Crosshair, FileImage, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { chargerLogo, FORMATS_ACCEPTES, TAILLE_MAX_OCTETS } from "@/lib/analyse-logo";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
-import { FORMATS, formatCm, placementPour, TECHNIQUES } from "@/lib/marquage";
+import { decrirePosition, FORMATS, formatCm, placementPour, TECHNIQUES } from "@/lib/marquage";
 import { nouveauMarquage, type Marquage } from "./etat";
 import { Puce, Titre } from "./ui";
 
@@ -173,7 +173,8 @@ export function EtapeMarquage({
               disabled={pris.has(e.id)}
               onClick={() => {
                 const p = placementPour(e.cle, e.libelle);
-                maj({ emplacementId: e.id, largeurCm: p.defautCm });
+                // Nouvel emplacement : taille type, logo recentré et droit.
+                maj({ emplacementId: e.id, largeurCm: p.defautCm, dxCm: 0, dyCm: 0, rotation: 0 });
               }}
             >
               {e.libelle} · {placementPour(e.cle, e.libelle).vue}
@@ -205,6 +206,43 @@ export function EtapeMarquage({
           <span className="w-20 text-right font-mono text-sm">{formatCm(actif.largeurCm)}</span>
         </label>
         <p className="mt-1 text-sm text-muted">Jusqu&apos;à {formatCm(placement.maxCm)} sur cet emplacement.</p>
+      </div>
+
+      <div>
+        <Titre>Position et inclinaison</Titre>
+        <p className="mt-1 text-sm text-muted">Glissez le logo directement sur l&apos;aperçu, ou réglez-le ici.</p>
+        <label className="mt-3 flex items-center gap-4">
+          <span className="font-mono text-xs tracking-wider uppercase">Inclinaison</span>
+          <input
+            type="range"
+            min={-180}
+            max={180}
+            step={1}
+            value={actif.rotation}
+            onChange={(e) => maj({ rotation: Number(e.target.value) })}
+            className="flex-1 accent-indigo"
+          />
+          <span className="w-14 text-right font-mono text-sm">{actif.rotation}°</span>
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {[-15, 0, 15, 45, 90].map((a) => (
+            <Puce key={a} choisie={actif.rotation === a} onClick={() => maj({ rotation: a })}>
+              {a}°
+            </Puce>
+          ))}
+        </div>
+        <p className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+          <span>{decrirePosition(actif.dxCm, actif.dyCm, actif.rotation) || "Position type de l'emplacement, logo droit."}</span>
+          {actif.dxCm || actif.dyCm || actif.rotation ? (
+            <button
+              type="button"
+              onClick={() => maj({ dxCm: 0, dyCm: 0, rotation: 0 })}
+              className="inline-flex min-h-11 items-center gap-1 font-display font-bold text-indigo underline"
+            >
+              <Crosshair aria-hidden size={16} /> Recentrer
+            </button>
+          ) : null}
+        </p>
       </div>
 
       <div>

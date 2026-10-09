@@ -80,20 +80,21 @@ export const formePour = (nom: string, famille: string | null): Forme =>
 
 /**
  * Position d'un emplacement sur la silhouette (repère 400 × 440, torse de
- * x = 100 à 300 ≈ 52 cm de large), et largeur maximale de marquage.
+ * x = 100 à 300 ≈ 52 cm de large), largeur maximale de marquage, et zone
+ * [x0, y0, x1, y1] dans laquelle le client peut déplacer le centre du logo.
  */
-export type Placement = { vue: Vue; x: number; y: number; maxCm: number; defautCm: number };
+export type Placement = { vue: Vue; x: number; y: number; maxCm: number; defautCm: number; zone: [number, number, number, number] };
 
 /** Unités du repère de la silhouette par centimètre de vêtement. */
 export const UNITES_PAR_CM = 200 / 52;
 
 const PLACEMENTS: Record<string, Placement> = {
-  coeur: { vue: "face", x: 248, y: 150, maxCm: 12, defautCm: 9 },
-  poitrine: { vue: "face", x: 200, y: 175, maxCm: 30, defautCm: 21 },
-  "manche-d": { vue: "face", x: 70, y: 118, maxCm: 9, defautCm: 7 },
-  "manche-g": { vue: "face", x: 330, y: 118, maxCm: 9, defautCm: 7 },
-  nuque: { vue: "dos", x: 200, y: 92, maxCm: 10, defautCm: 7 },
-  dos: { vue: "dos", x: 200, y: 200, maxCm: 32, defautCm: 29.7 },
+  coeur: { vue: "face", x: 248, y: 150, maxCm: 12, defautCm: 9, zone: [212, 110, 290, 210] },
+  poitrine: { vue: "face", x: 200, y: 175, maxCm: 30, defautCm: 21, zone: [115, 105, 285, 350] },
+  "manche-d": { vue: "face", x: 70, y: 118, maxCm: 9, defautCm: 7, zone: [35, 90, 95, 160] },
+  "manche-g": { vue: "face", x: 330, y: 118, maxCm: 9, defautCm: 7, zone: [305, 90, 365, 160] },
+  nuque: { vue: "dos", x: 200, y: 92, maxCm: 10, defautCm: 7, zone: [165, 70, 235, 125] },
+  dos: { vue: "dos", x: 200, y: 200, maxCm: 32, defautCm: 29.7, zone: [115, 95, 285, 380] },
 };
 
 const sansAccents = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -112,6 +113,32 @@ export function placementPour(cle: string, libelle: string): Placement {
   }
   if (/coeur/.test(t)) return PLACEMENTS.coeur;
   return PLACEMENTS.poitrine;
+}
+
+/** Décalage (en cm) ramené dans la zone de l'emplacement. */
+export function bornerDecalage(p: Placement, dxCm: number, dyCm: number): { dxCm: number; dyCm: number } {
+  const [x0, y0, x1, y1] = p.zone;
+  const x = Math.min(x1, Math.max(x0, p.x + dxCm * UNITES_PAR_CM));
+  const y = Math.min(y1, Math.max(y0, p.y + dyCm * UNITES_PAR_CM));
+  const arrondi = (v: number) => Math.round(v * 2) / 2;
+  return { dxCm: arrondi((x - p.x) / UNITES_PAR_CM), dyCm: arrondi((y - p.y) / UNITES_PAR_CM) };
+}
+
+/** Inclinaison ramenée entre -180° et 180°. */
+export const normaliserAngle = (a: number) => {
+  const r = ((((Math.round(a) + 180) % 360) + 360) % 360) - 180;
+  return r === -180 ? 180 : r;
+};
+
+/** « 2 cm vers la droite, 1,5 cm plus haut, incliné de 15° » — vide si rien n'a bougé. */
+export function decrirePosition(dxCm: number, dyCm: number, rotation: number): string {
+  const n = (v: number) => Math.abs(v).toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+  const parties = [
+    dxCm ? `${n(dxCm)} cm vers la ${dxCm > 0 ? "droite" : "gauche"}` : null,
+    dyCm ? `${n(dyCm)} cm plus ${dyCm > 0 ? "bas" : "haut"}` : null,
+    rotation ? `incliné de ${rotation}°` : null,
+  ].filter(Boolean);
+  return parties.join(", ");
 }
 
 /** Tailles de marquage proposées (largeur en cm). */
