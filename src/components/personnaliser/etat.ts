@@ -19,6 +19,8 @@ export type Marquage = {
   dyCm: number;
   /** Inclinaison en degrés (sens horaire), de -180 à 180. */
   rotation: number;
+  /** Calque verrouillé : ne se déplace plus et ne se modifie plus tant qu'il n'est pas déverrouillé. */
+  verrouille: boolean;
 };
 
 export type Configuration = {
@@ -37,7 +39,7 @@ export const nouvelId = () => `m${Date.now().toString(36)}${(compteur++).toStrin
 export function nouveauMarquage(m: ModeleCatalogue, emplacementId: string): Marquage {
   const z = m.emplacements.find((e) => e.id === emplacementId);
   const p = z ? placementPour(z.cle, z.libelle) : null;
-  return { id: nouvelId(), emplacementId, logo: null, largeurCm: p?.defautCm ?? 9, technique: "serigraphie", consigne: "", dxCm: 0, dyCm: 0, rotation: 0 };
+  return { id: nouvelId(), emplacementId, logo: null, largeurCm: p?.defautCm ?? 9, technique: "serigraphie", consigne: "", dxCm: 0, dyCm: 0, rotation: 0, verrouille: false };
 }
 
 export function configurationInitiale(m: ModeleCatalogue): Configuration {

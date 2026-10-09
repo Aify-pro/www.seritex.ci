@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState, type DragEvent } from "react";
-import { Crosshair, FileImage, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowDown, ArrowUp, Crosshair, FileImage, Layers, Loader2, Lock, LockOpen, Plus, Trash2, Upload } from "lucide-react";
 import { chargerLogo, FORMATS_ACCEPTES, TAILLE_MAX_OCTETS } from "@/lib/analyse-logo";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
-import { decrirePosition, FORMATS, formatCm, placementPour, TECHNIQUES } from "@/lib/marquage";
+import { bornerDecalage, decrirePosition, FORMATS, formatCm, placementPour, TAILLE_MAX_CM, TAILLE_MIN_CM, TECHNIQUES } from "@/lib/marquage";
 import { nouveauMarquage, type Marquage } from "./etat";
 import { Puce, Titre } from "./ui";
 
@@ -37,11 +37,29 @@ export function EtapeMarquage({
 
   const zone = modele.emplacements.find((e) => e.id === actif.emplacementId);
   const placement = placementPour(zone?.cle ?? "", zone?.libelle ?? "");
-  const pris = new Set(marquages.filter((m) => m.id !== actif.id).map((m) => m.emplacementId));
-  const libres = modele.emplacements.filter((e) => !marquages.some((m) => m.emplacementId === e.id));
+  const MAX_VISUELS = 8;
   const autresLogos = marquages.filter((m) => m.id !== actif.id && m.logo && m.logo !== actif.logo);
 
   const maj = (patch: Partial<Marquage>) => setMarquages(marquages.map((m) => (m.id === actif.id ? { ...m, ...patch } : m)));
+  const majCalque = (id: string, patch: Partial<Marquage>) => setMarquages(marquages.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+
+  /** Déplace un calque d'un cran (l'ordre de la liste est l'ordre de superposition, le dernier au-dessus). */
+  function deplacerCalque(i: number, sens: -1 | 1) {
+    const j = i + sens;
+    if (j < 0 || j >= marquages.length) return;
+    const copie = [...marquages];
+    [copie[i], copie[j]] = [copie[j], copie[i]];
+    setMarquages(copie);
+  }
+
+  /** Nouveau visuel sur la même face que le calque actif, posé plus bas pour ne pas le recouvrir (ex. cœur puis ventre). */
+  function ajouterVisuel() {
+    const base = nouveauMarquage(modele, actif.emplacementId);
+    const decale = bornerDecalage(placement, actif.dxCm, actif.dyCm + 12);
+    const n = { ...base, technique: actif.technique, largeurCm: placement.defautCm, ...decale };
+    setMarquages([...marquages, n]);
+    setActif(n.id);
+  }
 
   async function deposer(fichier: File | undefined) {
     if (!fichier) return;
@@ -68,28 +86,97 @@ export function EtapeMarquage({
 
   return (
     <div className="space-y-8">
-      {/* Onglets des marquages */}
-      <div className="flex flex-wrap items-center gap-2">
-        {marquages.map((m, i) => (
-          <Puce key={m.id} choisie={m.id === actif.id} onClick={() => setActif(m.id)}>
-            {i + 1} · {libelleEmplacement(modele, m.emplacementId)}
-          </Puce>
-        ))}
-        {libres.length > 0 ? (
+      {/* Calques : un par visuel ; l'ordre de la liste est l'ordre de superposition. */}
+      <div className="border-2 border-ink bg-ecru p-3">
+        <p className="flex items-center gap-2 font-display font-bold">
+          <Layers aria-hidden size={18} /> Calques
+          <span className="font-normal text-sm text-muted">— le dernier passe au-dessus ; verrouillez ceux qui sont bien placés.</span>
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          {marquages.map((m, i) => (
+            <li
+              key={m.id}
+              className={`flex items-center gap-1 border-2 px-1.5 py-1 ${m.id === actif.id ? "border-ink bg-paper shadow-hard-sm" : "border-transparent"}`}
+            >
+              <button type="button" onClick={() => setActif(m.id)} aria-pressed={m.id === actif.id} className="flex min-h-11 flex-1 items-center gap-2 text-left">
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-orange font-display text-sm font-black">{i + 1}</span>
+                {m.logo?.apercuUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.logo.apercuUrl} alt="" className="size-8 shrink-0 object-contain" />
+                ) : null}
+                <span className="min-w-0">
+                  <span className="block truncate font-display text-sm font-semibold">
+                    {libelleEmplacement(modele, m.emplacementId)} · {formatCm(m.largeurCm)}
+                  </span>
+                  <span className="block truncate text-xs text-muted">{m.logo ? m.logo.nom : "visuel à déposer"}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => deplacerCalque(i, -1)}
+                disabled={i === 0}
+                className="grid size-9 place-items-center disabled:opacity-30"
+                aria-label={`Descendre le calque ${i + 1}`}
+                title="Passer dessous"
+              >
+                <ArrowDown aria-hidden size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => deplacerCalque(i, 1)}
+                disabled={i === marquages.length - 1}
+                className="grid size-9 place-items-center disabled:opacity-30"
+                aria-label={`Monter le calque ${i + 1}`}
+                title="Passer dessus"
+              >
+                <ArrowUp aria-hidden size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => majCalque(m.id, { verrouille: !m.verrouille })}
+                aria-pressed={m.verrouille}
+                aria-label={m.verrouille ? `Déverrouiller le calque ${i + 1}` : `Verrouiller le calque ${i + 1}`}
+                title={m.verrouille ? "Déverrouiller" : "Verrouiller"}
+                className={`grid size-9 place-items-center border-2 ${m.verrouille ? "border-ink bg-ink text-ecru" : "border-transparent"}`}
+              >
+                {m.verrouille ? <Lock aria-hidden size={16} /> : <LockOpen aria-hidden size={16} />}
+              </button>
+              {marquages.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const reste = marquages.filter((x) => x.id !== m.id);
+                    setMarquages(reste);
+                    if (m.id === actif.id) setActif(reste[Math.max(0, i - 1)].id);
+                  }}
+                  className="grid size-9 place-items-center text-rouge"
+                  aria-label={`Retirer le calque ${i + 1}`}
+                  title="Retirer ce visuel"
+                >
+                  <Trash2 aria-hidden size={16} />
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        {marquages.length < MAX_VISUELS ? (
           <button
             type="button"
-            onClick={() => {
-              const n = { ...nouveauMarquage(modele, libres[0].id), logo: actif.logo, technique: actif.technique };
-              setMarquages([...marquages, n]);
-              setActif(n.id);
-            }}
-            className="inline-flex min-h-11 items-center gap-1 px-3 font-display text-sm font-bold text-indigo underline decoration-2 underline-offset-4"
+            onClick={ajouterVisuel}
+            className="mt-2 inline-flex min-h-11 items-center gap-1 px-1 font-display text-sm font-bold text-indigo underline decoration-2 underline-offset-4"
           >
-            <Plus aria-hidden size={16} /> Ajouter un marquage
+            <Plus aria-hidden size={16} /> Ajouter un visuel
           </button>
         ) : null}
       </div>
 
+      {actif.verrouille ? (
+        <p className="flex items-center gap-2 border-2 border-ink bg-orange/15 p-3 text-sm">
+          <Lock aria-hidden size={16} /> Calque {marquages.indexOf(actif) + 1} verrouillé : déverrouillez-le dans la liste pour le modifier.
+        </p>
+      ) : null}
+
+      <fieldset disabled={actif.verrouille} className="space-y-8 disabled:opacity-50">
       <div>
         <Titre>Votre logo</Titre>
         <p className="mt-1 text-muted">PNG, JPG ou SVG. Un JPG suffit pour l&apos;aperçu ; pour la production, Seritex vous demandera le fichier source.</p>
@@ -170,7 +257,6 @@ export function EtapeMarquage({
             <Puce
               key={e.id}
               choisie={e.id === actif.emplacementId}
-              disabled={pris.has(e.id)}
               onClick={() => {
                 const p = placementPour(e.cle, e.libelle);
                 // Nouvel emplacement : taille type, logo recentré et droit.
@@ -186,7 +272,7 @@ export function EtapeMarquage({
       <div>
         <Titre>Taille du marquage</Titre>
         <div className="mt-3 flex flex-wrap gap-2">
-          {FORMATS.filter((f) => f.cm <= placement.maxCm).map((f) => (
+          {FORMATS.map((f) => (
             <Puce key={f.id} choisie={actif.largeurCm === f.cm} onClick={() => maj({ largeurCm: f.cm })}>
               {f.label} · {formatCm(f.cm)}
             </Puce>
@@ -196,16 +282,34 @@ export function EtapeMarquage({
           <span className="font-mono text-xs tracking-wider uppercase">Largeur</span>
           <input
             type="range"
-            min={3}
-            max={placement.maxCm}
+            min={TAILLE_MIN_CM}
+            max={TAILLE_MAX_CM}
             step={0.5}
             value={actif.largeurCm}
             onChange={(e) => maj({ largeurCm: Number(e.target.value) })}
             className="flex-1 accent-indigo"
           />
-          <span className="w-20 text-right font-mono text-sm">{formatCm(actif.largeurCm)}</span>
+          <span className="flex items-center gap-1 font-mono text-sm">
+            <input
+              type="number"
+              min={TAILLE_MIN_CM}
+              max={TAILLE_MAX_CM}
+              step={0.5}
+              value={actif.largeurCm}
+              aria-label="Largeur en centimètres"
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (Number.isFinite(v) && v > 0) maj({ largeurCm: Math.min(TAILLE_MAX_CM, Math.max(TAILLE_MIN_CM, v)) });
+              }}
+              className="w-20 border-2 border-ink bg-paper px-2 py-1.5 text-right"
+            />
+            cm
+          </span>
         </label>
-        <p className="mt-1 text-sm text-muted">Jusqu&apos;à {formatCm(placement.maxCm)} sur cet emplacement.</p>
+        <p className="mt-1 text-sm text-muted">
+          Format habituel sur cet emplacement : jusqu&apos;à {formatCm(placement.maxCm)}. Vous pouvez aller au-delà : votre conseiller confirmera
+          la faisabilité, et ce qui dépasse du vêtement est masqué (il n&apos;est pas imprimé).
+        </p>
       </div>
 
       <div>
@@ -272,19 +376,7 @@ export function EtapeMarquage({
         />
       </div>
 
-      {marquages.length > 1 ? (
-        <button
-          type="button"
-          onClick={() => {
-            const reste = marquages.filter((m) => m.id !== actif.id);
-            setMarquages(reste);
-            setActif(reste[0].id);
-          }}
-          className="inline-flex min-h-11 items-center gap-2 font-display text-sm font-bold text-rouge"
-        >
-          <Trash2 aria-hidden size={16} /> Retirer ce marquage
-        </button>
-      ) : null}
+      </fieldset>
     </div>
   );
 }

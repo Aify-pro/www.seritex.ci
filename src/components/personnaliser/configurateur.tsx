@@ -64,6 +64,7 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
         dxCm: m.dxCm,
         dyCm: m.dyCm,
         rotation: m.rotation,
+        verrouille: m.verrouille,
       },
     ];
   });
