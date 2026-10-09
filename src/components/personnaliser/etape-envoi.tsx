@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, Download, FileImage, Lightbulb, Loader2, S
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
 import { validerCoordonnees, type Coordonnees, type ErreursCoordonnees, type FichierDepose, type MarquageEnvoye } from "@/lib/envoi-personnalisation";
 import { imageMaquette, pdfMaquette, telecharger, type ContenuMaquette } from "@/lib/maquette";
-import { controler, decrirePosition, formatCm, getTechnique, placementPour, rapportMarquage, techniqueAvecArticle } from "@/lib/marquage";
+import { controler, debordeDuVetement, decrirePosition, formatCm, getTechnique, placementPour, rapportMarquage, techniqueAvecArticle } from "@/lib/marquage";
 import { Apercu, cadragePour, formePour, type MarquageApercu } from "./apercu";
 import type { Configuration, Marquage } from "./etat";
 import { libelleEmplacement } from "./etape-marquage";
@@ -59,7 +59,8 @@ export function EtapeEnvoi({
     const alertes = m.logo ? controler(m.logo.analyse, m.technique, m.largeurCm, couleurHex).filter((c) => c.statut !== "ok").map((c) => c.titre) : [];
     const libelle = libelleEmplacement(modele, m.emplacementId);
     const zone = modele.emplacements.find((e) => e.id === m.emplacementId);
-    const vue = placementPour(zone?.cle ?? "", zone?.libelle ?? "").vue;
+    const placement = placementPour(zone?.cle ?? "", zone?.libelle ?? "");
+    const vue = placement.vue;
     // « Poitrine — avant » ; inutile quand l'emplacement le dit déjà (« Dos », « Manche D », « Nuque »).
     const emplacement = /manche|dos|nuque/i.test(libelle) ? libelle : `${libelle} — ${vue === "face" ? "avant" : "dos"}`;
     const ratio = m.logo?.analyse.analysable ? m.logo.analyse.ratio : 0.6;
@@ -71,6 +72,8 @@ export function EtapeEnvoi({
           quantite: total,
           couleurTextile: { nom: couleur, hex: couleurHex },
           premium,
+          formatHabituelCm: placement.maxCm,
+          deborde: debordeDuVetement(placement, m.largeurCm, m.logo.analyse.analysable ? m.logo.analyse.ratio : 0.6, m.dxCm, m.dyCm, m.rotation),
         })
       : null;
     const apercu = sansCadre.find((a) => a.id === m.id) ?? null;

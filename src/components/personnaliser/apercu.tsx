@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useId, useRef, type KeyboardEvent, type PointerEvent } from "react";
-import { bornerDecalage, formatCm, normaliserAngle, UNITES_PAR_CM, type Forme, type Placement, type Vue } from "@/lib/marquage";
+import { bornerDecalage, formatCm, normaliserAngle, TAILLE_MAX_CM, TAILLE_MIN_CM, UNITES_PAR_CM, type Forme, type Placement, type Vue } from "@/lib/marquage";
 
 /** Un marquage à dessiner sur la silhouette. */
 export type MarquageApercu = {
@@ -15,6 +15,8 @@ export type MarquageApercu = {
   dxCm: number;
   dyCm: number;
   rotation: number;
+  /** Calque verrouillé : ni sélection ni déplacement sur l'aperçu. */
+  verrouille: boolean;
 };
 
 export type ModificationMarquage = Partial<{ dxCm: number; dyCm: number; largeurCm: number; rotation: number }>;
@@ -105,7 +107,7 @@ export const Apercu = forwardRef<
   }
 
   function commencer(e: PointerEvent, m: MarquageApercu, mode: Geste["mode"]) {
-    if (!interactif) return;
+    if (!interactif || m.verrouille) return;
     e.preventDefault();
     e.stopPropagation();
     if (!m.actif) onSelectionner?.(m.id);
@@ -128,7 +130,7 @@ export const Apercu = forwardRef<
       const lx = (p.x - cx) * Math.cos(a) - (p.y - cy) * Math.sin(a);
       const ly = (p.x - cx) * Math.sin(a) + (p.y - cy) * Math.cos(a);
       const largeur = (2 * Math.max(Math.abs(lx), Math.abs(ly) / m.ratio) - 6) / UNITES_PAR_CM;
-      onModifier(m.id, { largeurCm: Math.min(m.placement.maxCm, Math.max(3, Math.round(largeur * 2) / 2)) });
+      onModifier(m.id, { largeurCm: Math.min(TAILLE_MAX_CM, Math.max(TAILLE_MIN_CM, Math.round(largeur * 2) / 2)) });
     } else {
       let angle = (Math.atan2(p.y - cy, p.x - cx) * 180) / Math.PI + 90;
       angle = normaliserAngle(angle);
@@ -146,7 +148,7 @@ export const Apercu = forwardRef<
   }
 
   function clavier(e: KeyboardEvent, m: MarquageApercu) {
-    if (!onModifier) return;
+    if (!onModifier || m.verrouille) return;
     const pas = e.shiftKey ? 2 : 0.5;
     const deplacer = (dx: number, dy: number) => onModifier(m.id, bornerDecalage(m.placement, m.dxCm + dx, m.dyCm + dy));
     const actions: Record<string, () => void> = {
@@ -154,9 +156,9 @@ export const Apercu = forwardRef<
       ArrowRight: () => deplacer(pas, 0),
       ArrowUp: () => deplacer(0, -pas),
       ArrowDown: () => deplacer(0, pas),
-      "+": () => onModifier(m.id, { largeurCm: Math.min(m.placement.maxCm, m.largeurCm + 0.5) }),
-      "=": () => onModifier(m.id, { largeurCm: Math.min(m.placement.maxCm, m.largeurCm + 0.5) }),
-      "-": () => onModifier(m.id, { largeurCm: Math.max(3, m.largeurCm - 0.5) }),
+      "+": () => onModifier(m.id, { largeurCm: Math.min(TAILLE_MAX_CM, m.largeurCm + 0.5) }),
+      "=": () => onModifier(m.id, { largeurCm: Math.min(TAILLE_MAX_CM, m.largeurCm + 0.5) }),
+      "-": () => onModifier(m.id, { largeurCm: Math.max(TAILLE_MIN_CM, m.largeurCm - 0.5) }),
       "[": () => onModifier(m.id, { rotation: normaliserAngle(m.rotation - (e.shiftKey ? 15 : 5)) }),
       "]": () => onModifier(m.id, { rotation: normaliserAngle(m.rotation + (e.shiftKey ? 15 : 5)) }),
     };
@@ -189,6 +191,10 @@ export const Apercu = forwardRef<
           <stop offset="0.75" stopColor="#000" stopOpacity="0" />
           <stop offset="1" stopColor="#000" stopOpacity="0.14" />
         </linearGradient>
+        {/* Ce qui dépasse du vêtement n'est pas imprimé : les visuels sont découpés à sa silhouette. */}
+        <clipPath id={`${gid}-vetement`}>
+          <path d={`${CORPS} ${vue === "face" ? COL_FACE : COL_DOS} Z`} />
+        </clipPath>
       </defs>
       <ellipse cx="200" cy="428" rx="130" ry="8" fill="rgb(21 22 58 / 0.12)" />
       <path d={`${CORPS} ${vue === "face" ? COL_FACE : COL_DOS} Z`} fill={couleurHex} stroke={trait} strokeWidth="2" strokeLinejoin="round" />
@@ -209,12 +215,33 @@ export const Apercu = forwardRef<
         </g>
       ) : null}
 
+      {/* Calque 1 : les visuels, découpés au vêtement, dans l'ordre des calques. */}
+      <g clipPath={`url(#${gid}-vetement)`}>
+        {visibles.map((m) => {
+          const w = m.largeurCm * UNITES_PAR_CM;
+          const h = w * m.ratio;
+          const cx = m.placement.x + m.dxCm * UNITES_PAR_CM;
+          const cy = m.placement.y + m.dyCm * UNITES_PAR_CM;
+          return (
+            <g key={m.id} transform={`translate(${cx} ${cy}) rotate(${m.rotation})`} pointerEvents="none">
+              {m.apercuUrl ? (
+                <image href={m.apercuUrl} x={-w / 2} y={-h / 2} width={w} height={h} preserveAspectRatio="xMidYMid meet" />
+              ) : (
+                <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="rgb(255 255 255 / 0.35)" stroke="#15163a" strokeDasharray="3 3" />
+              )}
+            </g>
+          );
+        })}
+      </g>
+
+      {/* Calque 2 : zones de prise, cadres, poignées et cotes (non découpés, pour rattraper un visuel sorti du vêtement). */}
       {visibles.map((m) => {
         const w = m.largeurCm * UNITES_PAR_CM;
         const h = w * m.ratio;
         const cx = m.placement.x + m.dxCm * UNITES_PAR_CM;
         const cy = m.placement.y + m.dyCm * UNITES_PAR_CM;
-        const poignees = interactif && m.actif;
+        const manipulable = interactif && !m.verrouille;
+        const poignees = manipulable && m.actif;
         // Demi-hauteur de l'encombrement incliné, pour placer l'étiquette au-dessus.
         const a = (m.rotation * Math.PI) / 180;
         const demiHaut = (Math.abs(h * Math.cos(a)) + Math.abs(w * Math.sin(a))) / 2;
@@ -222,19 +249,17 @@ export const Apercu = forwardRef<
           <g key={m.id}>
             <g
               transform={`translate(${cx} ${cy}) rotate(${m.rotation})`}
-              tabIndex={interactif ? 0 : undefined}
-              role={interactif ? "button" : undefined}
-              aria-label={interactif ? "Logo : glisser pour déplacer ; flèches, + / − et [ / ] au clavier" : undefined}
-              onKeyDown={interactif ? (e) => clavier(e, m) : undefined}
-              onFocus={interactif && !m.actif ? () => onSelectionner?.(m.id) : undefined}
-              onPointerDown={interactif ? (e) => commencer(e, m, "deplacer") : undefined}
-              style={interactif ? { cursor: "move", outline: "none" } : undefined}
+              tabIndex={manipulable ? 0 : undefined}
+              role={manipulable ? "button" : undefined}
+              aria-label={manipulable ? "Visuel : glisser pour déplacer ; flèches, + / − et [ / ] au clavier" : undefined}
+              onKeyDown={manipulable ? (e) => clavier(e, m) : undefined}
+              onFocus={manipulable && !m.actif ? () => onSelectionner?.(m.id) : undefined}
+              onPointerDown={manipulable ? (e) => commencer(e, m, "deplacer") : undefined}
+              style={manipulable ? { cursor: "move", outline: "none" } : undefined}
+              pointerEvents={manipulable ? "all" : "none"}
             >
-              {m.apercuUrl ? (
-                <image href={m.apercuUrl} x={-w / 2} y={-h / 2} width={w} height={h} preserveAspectRatio="xMidYMid meet" />
-              ) : (
-                <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="rgb(255 255 255 / 0.35)" stroke="#15163a" strokeDasharray="3 3" />
-              )}
+              {/* Zone de prise invisible : tout le rectangle du visuel. */}
+              {manipulable ? <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="transparent" /> : null}
               {cotes ? (
                 <g stroke="#e2162d" fill="#e2162d" strokeWidth={1.2 * k} fontFamily="var(--font-mono-jb), 'JetBrains Mono', Menlo, Consolas, monospace" fontSize={11 * k}>
                   <line x1={-w / 2} y1={h / 2 + 10 * k} x2={w / 2} y2={h / 2 + 10 * k} />
@@ -259,8 +284,17 @@ export const Apercu = forwardRef<
                   </text>
                 </g>
               ) : null}
-              {poignees || (m.actif && !interactif) ? (
-                <rect x={-w / 2 - 3} y={-h / 2 - 3} width={w + 6} height={h + 6} fill="none" stroke="#f28c1b" strokeWidth="1.5" strokeDasharray="5 3" />
+              {m.actif ? (
+                <rect
+                  x={-w / 2 - 3}
+                  y={-h / 2 - 3}
+                  width={w + 6}
+                  height={h + 6}
+                  fill="none"
+                  stroke={m.verrouille ? "#4c4d6b" : "#f28c1b"}
+                  strokeWidth="1.5"
+                  strokeDasharray="5 3"
+                />
               ) : null}
               {poignees ? (
                 <>
@@ -306,6 +340,7 @@ export const Apercu = forwardRef<
                 paintOrder="stroke"
                 pointerEvents="none"
               >
+                {m.verrouille ? "🔒 " : ""}
                 {formatCm(m.largeurCm)}
                 {m.rotation ? ` · ${m.rotation}°` : ""}
               </text>

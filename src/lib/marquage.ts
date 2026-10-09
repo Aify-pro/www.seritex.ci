@@ -83,22 +83,59 @@ export const formePour = (nom: string, famille: string | null): Forme =>
   /polo|piqu/i.test(`${nom} ${famille ?? ""}`) ? "polo" : "tshirt";
 
 /**
- * Position d'un emplacement sur la silhouette (repère 400 × 440, torse de
- * x = 100 à 300 ≈ 52 cm de large), largeur maximale de marquage, et zone
- * [x0, y0, x1, y1] dans laquelle le client peut déplacer le centre du logo.
+ * Position type d'un emplacement sur la silhouette (repère 400 × 440, torse
+ * de x = 100 à 300 ≈ 52 cm de large), format habituel (`maxCm`, au-delà le
+ * conseiller vérifie la faisabilité) et taille proposée par défaut.
  */
-export type Placement = { vue: Vue; x: number; y: number; maxCm: number; defautCm: number; zone: [number, number, number, number] };
+export type Placement = { vue: Vue; x: number; y: number; maxCm: number; defautCm: number };
+
+/** Taille de marquage : libre entre ces bornes ; ce qui dépasse du vêtement n'est pas imprimé. */
+export const TAILLE_MIN_CM = 2;
+export const TAILLE_MAX_CM = 100;
+
+/** Contour du vêtement (corps + manches) dans le repère de l'aperçu, col compris en ligne droite. */
+export const SILHOUETTE: [number, number][] = [
+  [140, 40], [70, 62], [5, 150], [60, 185], [100, 150], [100, 420], [300, 420], [300, 150], [340, 185], [395, 150], [330, 62], [260, 40],
+];
+
+const dansSilhouette = ([x, y]: [number, number]) => {
+  let dedans = false;
+  for (let i = 0, j = SILHOUETTE.length - 1; i < SILHOUETTE.length; j = i++) {
+    const [xi, yi] = SILHOUETTE[i];
+    const [xj, yj] = SILHOUETTE[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) dedans = !dedans;
+  }
+  return dedans;
+};
+
+/** Le visuel (incliné compris) sort-il du vêtement ? Contrôle sur les bords du visuel. */
+export function debordeDuVetement(p: Placement, largeurCm: number, ratio: number, dxCm: number, dyCm: number, rotation: number): boolean {
+  const w = largeurCm * UNITES_PAR_CM;
+  const h = w * ratio;
+  const cx = p.x + dxCm * UNITES_PAR_CM;
+  const cy = p.y + dyCm * UNITES_PAR_CM;
+  const a = (rotation * Math.PI) / 180;
+  const points: [number, number][] = [];
+  for (const fx of [-0.5, -0.25, 0, 0.25, 0.5])
+    for (const fy of [-0.5, -0.25, 0, 0.25, 0.5]) {
+      if (Math.abs(fx) !== 0.5 && Math.abs(fy) !== 0.5) continue; // bords seulement
+      const lx = fx * w;
+      const ly = fy * h;
+      points.push([cx + lx * Math.cos(a) - ly * Math.sin(a), cy + lx * Math.sin(a) + ly * Math.cos(a)]);
+    }
+  return points.some((pt) => !dansSilhouette(pt));
+}
 
 /** Unités du repère de la silhouette par centimètre de vêtement. */
 export const UNITES_PAR_CM = 200 / 52;
 
 const PLACEMENTS: Record<string, Placement> = {
-  coeur: { vue: "face", x: 248, y: 150, maxCm: 12, defautCm: 9, zone: [212, 110, 290, 210] },
-  poitrine: { vue: "face", x: 200, y: 175, maxCm: 30, defautCm: 21, zone: [115, 105, 285, 350] },
-  "manche-d": { vue: "face", x: 70, y: 118, maxCm: 9, defautCm: 7, zone: [35, 90, 95, 160] },
-  "manche-g": { vue: "face", x: 330, y: 118, maxCm: 9, defautCm: 7, zone: [305, 90, 365, 160] },
-  nuque: { vue: "dos", x: 200, y: 92, maxCm: 10, defautCm: 7, zone: [165, 70, 235, 125] },
-  dos: { vue: "dos", x: 200, y: 200, maxCm: 32, defautCm: 29.7, zone: [115, 95, 285, 380] },
+  coeur: { vue: "face", x: 248, y: 150, maxCm: 12, defautCm: 9 },
+  poitrine: { vue: "face", x: 200, y: 175, maxCm: 30, defautCm: 21 },
+  "manche-d": { vue: "face", x: 70, y: 118, maxCm: 9, defautCm: 7 },
+  "manche-g": { vue: "face", x: 330, y: 118, maxCm: 9, defautCm: 7 },
+  nuque: { vue: "dos", x: 200, y: 92, maxCm: 10, defautCm: 7 },
+  dos: { vue: "dos", x: 200, y: 200, maxCm: 32, defautCm: 29.7 },
 };
 
 const sansAccents = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -119,9 +156,13 @@ export function placementPour(cle: string, libelle: string): Placement {
   return PLACEMENTS.poitrine;
 }
 
-/** Décalage (en cm) ramené dans la zone de l'emplacement. */
+/**
+ * Décalage (en cm) ramené dans le cadre du vêtement : le visuel se place
+ * n'importe où sur la face (cœur, ventre, épaule…) ; ce qui dépasse du
+ * vêtement est masqué à l'aperçu et signalé.
+ */
 export function bornerDecalage(p: Placement, dxCm: number, dyCm: number): { dxCm: number; dyCm: number } {
-  const [x0, y0, x1, y1] = p.zone;
+  const [x0, y0, x1, y1] = [5, 40, 395, 420];
   const x = Math.min(x1, Math.max(x0, p.x + dxCm * UNITES_PAR_CM));
   const y = Math.min(y1, Math.max(y0, p.y + dyCm * UNITES_PAR_CM));
   const arrondi = (v: number) => Math.round(v * 2) / 2;
@@ -303,6 +344,10 @@ export type ContexteRapport = {
   couleurTextile: { nom: string; hex: string | null };
   /** Article « premium » (polo, piqué…) : la broderie y est naturelle. */
   premium: boolean;
+  /** Format habituel de l'emplacement (cm) : au-delà, faisabilité à confirmer. */
+  formatHabituelCm: number;
+  /** Une partie du visuel sort du vêtement (elle n'est pas imprimée). */
+  deborde: boolean;
 };
 
 export type Rapport = {
@@ -434,6 +479,14 @@ export function rapportMarquage(a: AnalyseLogo, c: ContexteRapport): Rapport {
   if (traitMm < t.traitMinMm)
     aVerifier.push(
       `Certains traits de votre logo ne mesurent qu'environ ${n1(traitMm)} mm à cette taille, en dessous des ${n1(t.traitMinMm)} mm conseillés pour ${techniqueAvecArticle(t.id)}. Agrandir un peu le marquage ou épaissir ces traits garantira un rendu net.`,
+    );
+  if (c.largeurCm > c.formatHabituelCm)
+    aVerifier.push(
+      `Votre visuel mesure ${formatCm(c.largeurCm)} de large, au-delà du format habituel de cet emplacement (${formatCm(c.formatHabituelCm)}). C'est souvent possible, mais votre conseiller confirmera la faisabilité (taille du cadre d'impression ou de broderie).`,
+    );
+  if (c.deborde)
+    aVerifier.push(
+      "Une partie de votre visuel dépasse du vêtement : elle est masquée sur l'aperçu et ne sera pas imprimée. Réduisez ou recentrez le visuel si elle doit apparaître.",
     );
   if (!a.transparent)
     aVerifier.push(
