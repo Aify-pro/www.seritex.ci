@@ -66,6 +66,10 @@ export const TECHNIQUES: Technique[] = [
 
 export const getTechnique = (id: TechniqueId) => TECHNIQUES.find((t) => t.id === id)!;
 
+/** Nom de la technique avec son article : « la sérigraphie », « l'impression numérique »… */
+export const techniqueAvecArticle = (id: TechniqueId) =>
+  ({ serigraphie: "la sérigraphie", "impression-numerique": "l'impression numérique", broderie: "la broderie", "flex-quadriflex": "le Flex / QuadriFlex" })[id];
+
 /* ------------------------------------------------------------------------ */
 /* Emplacements                                                             */
 /* ------------------------------------------------------------------------ */
@@ -288,15 +292,163 @@ export function controler(
   return out;
 }
 
-/** Technique conseillée pour ce logo et cette quantité (indicatif). */
-export function techniqueConseillee(a: AnalyseLogo, quantite: number): { id: TechniqueId; raison: string } {
-  if (a.analysable && (a.degrade || a.couleurs.length > 5)) {
-    return { id: "impression-numerique", raison: "Dégradés ou nombreuses couleurs : l'impression numérique les rend fidèlement." };
+/* ------------------------------------------------------------------------ */
+/* Rapport de marquage (étape « Ma maquette » et maquette PDF)               */
+/* ------------------------------------------------------------------------ */
+
+export type ContexteRapport = {
+  technique: TechniqueId;
+  largeurCm: number;
+  quantite: number;
+  couleurTextile: { nom: string; hex: string | null };
+  /** Article « premium » (polo, piqué…) : la broderie y est naturelle. */
+  premium: boolean;
+};
+
+export type Rapport = {
+  /** Ce que nous voyons dans le fichier. */
+  constat: string;
+  couleurs: string[];
+  /** Dégradé : `couleurs` sont alors les teintes principales, pas des aplats. */
+  degrade: boolean;
+  conseil: { id: TechniqueId; label: string; pourquoi: string };
+  /** Pourquoi pas les autres techniques, une phrase chacune. */
+  alternatives: { id: TechniqueId; label: string; avis: string }[];
+  /** Si le client a choisi une autre technique que celle conseillée. */
+  remarqueChoix: string | null;
+  /** Points à vérifier, rédigés. */
+  aVerifier: string[];
+};
+
+const ORDRE: TechniqueId[] = ["serigraphie", "impression-numerique", "broderie", "flex-quadriflex"];
+const n1 = (v: number) => v.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+
+/**
+ * Rapport rédigé pour le client : couleurs détectées, technique que nous
+ * privilégions et pourquoi, pourquoi pas les autres, points à vérifier.
+ * Purement indicatif : le conseiller confirme au devis, puis au BAT.
+ */
+export function rapportMarquage(a: AnalyseLogo, c: ContexteRapport): Rapport {
+  const textileFonce = c.couleurTextile.hex ? !clair(c.couleurTextile.hex) : false;
+  const textile = c.couleurTextile.nom.toLowerCase();
+
+  if (!a.analysable) {
+    const t = getTechnique(c.technique);
+    return {
+      constat:
+        "Votre fichier est dans un format que nous ne pouvons pas analyser en ligne (PDF, AI ou EPS). C'est souvent un fichier source de bonne qualité : votre conseiller l'ouvrira pour compter les couleurs et vérifier les traits.",
+      couleurs: [],
+      degrade: false,
+      conseil: { id: t.id, label: t.label, pourquoi: `Nous partons sur la technique que vous avez choisie, ${techniqueAvecArticle(t.id)} ; votre conseiller vous confirmera qu'elle convient après examen du fichier.` },
+      alternatives: [],
+      remarqueChoix: null,
+      aVerifier: [],
+    };
   }
-  if (quantite > 0 && quantite < 30) {
-    return { id: "impression-numerique", raison: "Petite série : l'impression numérique évite les frais d'écrans." };
+
+  const n = a.couleurs.length;
+  const traitMm = a.traitFinRatio * c.largeurCm * 10;
+  const q = c.quantite;
+
+  // Constat
+  const constat = [
+    a.degrade
+      ? "Votre logo contient des dégradés ou des nuances (effet photo) : les couleurs passent de l'une à l'autre en douceur, sans zones franches à séparer."
+      : `Votre logo est composé de ${n} couleur${n > 1 ? "s" : ""} en aplat${n > 1 ? "s" : ""} (des zones de couleur franche, sans dégradé).`,
+    a.vectoriel
+      ? "C'est un fichier vectoriel : il restera net quelle que soit la taille."
+      : `C'est une image de ${a.largeurUtilePx} pixels de large pour ${formatCm(c.largeurCm)} imprimés.`,
+    `Il sera marqué sur un textile ${textile}${textileFonce ? ", donc foncé" : ""}.`,
+  ].join(" ");
+
+  // Notation de chaque technique, avec les raisons qui la portent ou la desservent.
+  type Eval = { id: TechniqueId; score: number; pour: string[]; contre: string[] };
+  const ev: Record<TechniqueId, Eval> = {
+    serigraphie: { id: "serigraphie", score: 0, pour: [], contre: [] },
+    "impression-numerique": { id: "impression-numerique", score: 0, pour: [], contre: [] },
+    broderie: { id: "broderie", score: 0, pour: [], contre: [] },
+    "flex-quadriflex": { id: "flex-quadriflex", score: 0, pour: [], contre: [] },
+  };
+  const pour = (id: TechniqueId, pts: number, txt: string) => ((ev[id].score += pts), ev[id].pour.push(txt));
+  const contre = (id: TechniqueId, pts: number, txt: string) => ((ev[id].score -= pts), ev[id].contre.push(txt));
+
+  // Sérigraphie
+  if (!a.degrade && n <= 5) pour("serigraphie", 3, `vos ${n} couleur${n > 1 ? "s" : ""} en aplat${n > 1 ? "s" : ""} demandent ${n} écran${n > 1 ? "s" : ""} seulement`);
+  if (q >= 50) pour("serigraphie", 3, `sur ${q} pièces, la préparation des écrans est vite amortie et chaque pièce revient moins cher`);
+  else if (q >= 30) pour("serigraphie", 1, `à partir d'une trentaine de pièces, les écrans commencent à être amortis`);
+  else contre("serigraphie", 2, `sur ${q} pièce${q > 1 ? "s" : ""}, la préparation des écrans pèse lourd`);
+  if (a.degrade) contre("serigraphie", 3, "les dégradés doivent être tramés en petits points, le rendu est moins fidèle");
+  if (n > 5) contre("serigraphie", 4, `au-delà de 5 couleurs (ici ${n}), il faudrait trop d'écrans`);
+  if (textileFonce && !a.degrade) ev.serigraphie.pour.push("l'encre couvre très bien un textile foncé, avec une sous-couche blanche si besoin");
+
+  // Impression numérique
+  if (a.degrade) pour("impression-numerique", 3, "elle reproduit fidèlement les dégradés et les nuances");
+  if (n > 5) pour("impression-numerique", 3, "le nombre de couleurs n'a aucune incidence");
+  if (q > 0 && q < 30) pour("impression-numerique", 3, `pour ${q} pièce${q > 1 ? "s" : ""}, il n'y a aucun écran à préparer`);
+  if (traitMm < 0.5) pour("impression-numerique", 1, "elle restitue les traits très fins");
+  if (q >= 100 && !a.degrade && n <= 5) contre("impression-numerique", 1, `sur ${q} pièces en aplats, elle est moins avantageuse que la sérigraphie`);
+  if (textileFonce) ev["impression-numerique"].contre.push("sur textile foncé, une sous-couche blanche est déposée, le toucher est un peu plus marqué");
+
+  // Broderie
+  if (c.premium) pour("broderie", 3, "c'est la finition naturelle d'un polo ou d'une pièce haut de gamme, en relief et très durable");
+  if (!a.degrade && n <= 6) pour("broderie", 1, "le logo est simple, chaque couleur correspond à un fil");
+  if (a.degrade) contre("broderie", 4, "un dégradé ne se brode pas, il serait simplifié en quelques couleurs");
+  if (traitMm < 1) contre("broderie", 3, `certains traits ne mesurent que ${n1(traitMm)} mm à cette taille, trop fins pour un fil (1 mm minimum)`);
+  if (c.largeurCm > 25) contre("broderie", 2, `à ${formatCm(c.largeurCm)} de large, une broderie devient lourde et rigide sur le tissu`);
+
+  // Flex / QuadriFlex
+  if (n <= 1 && !a.degrade) pour("flex-quadriflex", 3, "un logo d'une seule couleur se découpe parfaitement dans un vinyle de couleur (Flex)");
+  if (q > 0 && q <= 20) pour("flex-quadriflex", 1, "il convient bien aux petites quantités et aux noms ou numéros personnalisés");
+  if (n > 1 || a.degrade) ev["flex-quadriflex"].contre.push("avec plusieurs couleurs, il faut passer au QuadriFlex, imprimé puis découpé, au toucher plus épais");
+  if (c.largeurCm > 25) contre("flex-quadriflex", 1, "sur une grande surface, le vinyle forme une zone moins souple");
+
+  const classement = ORDRE.map((id) => ev[id]).sort((x, y) => y.score - x.score || ORDRE.indexOf(x.id) - ORDRE.indexOf(y.id));
+  const best = classement[0];
+  const label = getTechnique(best.id).label;
+  const pourquoi = `Nous privilégions ${techniqueAvecArticle(best.id)} : ${(best.pour.length ? best.pour : ["c'est la technique la plus polyvalente pour ce visuel"]).join(" ; ")}.`;
+
+  const alternatives = classement.slice(1).map((e) => {
+    const t = getTechnique(e.id);
+    const avis = e.contre.length
+      ? `${e.contre[0].charAt(0).toUpperCase()}${e.contre[0].slice(1)}.`
+      : e.pour.length
+        ? `Possible aussi : ${e.pour[0]}.`
+        : "Possible, mais sans avantage particulier pour ce logo.";
+    return { id: e.id, label: t.label, avis };
+  });
+
+  const remarqueChoix =
+    c.technique !== best.id
+      ? `Vous avez choisi ${techniqueAvecArticle(c.technique)}. C'est possible ; nous vous recommandons toutefois ${techniqueAvecArticle(best.id)} pour les raisons ci-dessus. Votre conseiller en discutera avec vous.`
+      : null;
+
+  const aVerifier: string[] = [];
+  const t = getTechnique(c.technique);
+  if (!a.vectoriel) {
+    const dpi = Math.round(a.largeurUtilePx / (c.largeurCm / 2.54));
+    if (dpi < t.dpiMin)
+      aVerifier.push(
+        `La résolution de votre image est un peu faible pour ${formatCm(c.largeurCm)} (${dpi} points par pouce, ${t.dpiMin} conseillés) : le marquage risquerait d'être flou. Envoyez-nous si possible le fichier d'origine de votre logo (PDF, AI, SVG ou une image plus grande).`,
+      );
   }
-  return { id: "serigraphie", raison: "Logo en aplats et série : la sérigraphie offre le meilleur rendu et la meilleure tenue." };
+  if (traitMm < t.traitMinMm)
+    aVerifier.push(
+      `Certains traits de votre logo ne mesurent qu'environ ${n1(traitMm)} mm à cette taille, en dessous des ${n1(t.traitMinMm)} mm conseillés pour ${techniqueAvecArticle(t.id)}. Agrandir un peu le marquage ou épaissir ces traits garantira un rendu net.`,
+    );
+  if (!a.transparent)
+    aVerifier.push(
+      `Votre fichier a un fond${a.fond ? ` (${a.fond})` : ""} : nous l'avons retiré de l'aperçu, car seul le dessin est normalement imprimé. Dites-le à votre conseiller si ce fond doit apparaître.`,
+    );
+
+  return {
+    constat,
+    couleurs: a.degrade ? a.couleurs.slice(0, 5) : a.couleurs,
+    degrade: a.degrade,
+    conseil: { id: best.id, label, pourquoi },
+    alternatives,
+    remarqueChoix,
+    aVerifier,
+  };
 }
 
 export const formatCm = (cm: number) => `${cm.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} cm`;

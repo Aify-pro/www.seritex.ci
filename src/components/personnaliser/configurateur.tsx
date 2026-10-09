@@ -7,11 +7,10 @@ import { placementPour, type Vue } from "@/lib/marquage";
 import { Apercu, formePour, type MarquageApercu } from "./apercu";
 import { configurationInitiale, quantiteTotale, type Configuration, type Marquage } from "./etat";
 import { EtapeArticle } from "./etape-article";
-import { EtapeControles } from "./etape-controles";
 import { EtapeEnvoi } from "./etape-envoi";
 import { EtapeMarquage } from "./etape-marquage";
 
-const ETAPES = ["Couleur & quantité", "Logo & emplacement", "Contrôles", "Ma maquette"] as const;
+const ETAPES = ["Couleur & quantité", "Logo & emplacement", "Ma maquette"] as const;
 
 /** Parcours de personnalisation d'un article de l'e-shop (fiche article). */
 export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
@@ -97,8 +96,6 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
             <EtapeArticle modele={modele} config={config} modifier={modifier} />
           ) : etape === 1 ? (
             <EtapeMarquage modele={modele} marquages={config.marquages} actifId={actifId} setActif={setActif} setMarquages={setMarquages} />
-          ) : etape === 2 ? (
-            <EtapeControles modele={modele} marquages={config.marquages} couleurHex={couleur?.hex ?? null} quantite={total} setMarquages={setMarquages} />
           ) : (
             <EtapeEnvoi
               modele={modele}
@@ -108,6 +105,7 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
               grammage={grammage?.grammage ? `${grammage.grammage} g/m²` : (grammage?.nom ?? null)}
               total={total}
               apercus={apercus}
+              setMarquages={setMarquages}
             />
           )}
 
