@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
-import { placementPour, type Vue } from "@/lib/marquage";
+import { type Vue } from "@/lib/marquage";
+import { couleursDesZones, mockupPour, placementDe } from "@/lib/gabarit";
 import { Apercu, formePour, type MarquageApercu } from "./apercu";
 import { configurationInitiale, quantiteTotale, type Configuration, type Marquage } from "./etat";
 import { EtapeArticle } from "./etape-article";
@@ -28,6 +29,8 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
   const couleur = modele.couleurs.find((c) => c.id === config.couleurId) ?? null;
   const grammage = modele.grammages.find((g) => g.id === config.grammageId) ?? null;
   const couleurHex = couleur?.hex ?? "#FFFFFF";
+  // Couleur de chaque zone du mockup (couleur unique partout, ou choix par zone).
+  const couleursZonesHex = couleursDesZones(modele, config.couleurId, config.couleursZones);
   const total = quantiteTotale(config);
   const quantiteManquante = total < 1;
   const photos = modele.medias.filter((p) => p.couleurId === null || p.couleurId === config.couleurId);
@@ -40,14 +43,14 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
     const actif =
       marquages.length > config.marquages.length ? marquages[marquages.length - 1] : (marquages.find((m) => m.id === actifId) ?? marquages[0]);
     const z = actif && modele.emplacements.find((e) => e.id === actif.emplacementId);
-    if (z) setVue(placementPour(z.cle, z.libelle).vue);
+    if (z) setVue(placementDe(modele, z.id).vue);
   }
 
   function setActif(id: string) {
     setActifId(id);
     const m = config.marquages.find((x) => x.id === id);
     const z = m && modele.emplacements.find((e) => e.id === m.emplacementId);
-    if (z) setVue(placementPour(z.cle, z.libelle).vue);
+    if (z) setVue(placementDe(modele, z.id).vue);
   }
 
   const apercus: MarquageApercu[] = config.marquages.flatMap((m) => {
@@ -56,7 +59,7 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
     return [
       {
         id: m.id,
-        placement: placementPour(z.cle, z.libelle),
+        placement: placementDe(modele, z.id),
         largeurCm: m.largeurCm,
         ratio: m.logo?.analyse.analysable ? m.logo.analyse.ratio : 0.6,
         apercuUrl: m.logo?.apercuUrl ?? null,
@@ -106,6 +109,7 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
               grammage={grammage?.grammage ? `${grammage.grammage} g/m²` : (grammage?.nom ?? null)}
               total={total}
               apercus={apercus}
+              couleursZonesHex={couleursZonesHex}
               setMarquages={setMarquages}
             />
           )}
@@ -141,6 +145,8 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
               <Apercu
                 vue={vue}
                 couleurHex={couleurHex}
+                mockup={mockupPour(modele, vue)}
+                couleursZones={couleursZonesHex}
                 forme={formePour(modele.nom, modele.sousFamille)}
                 marquages={apercus}
                 // Étape « Logo & emplacement » : le logo se déplace, se redimensionne et s'incline directement ici.
@@ -163,7 +169,14 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
                   className={`flex min-h-12 items-center gap-2 border-2 border-ink px-3 font-display text-sm font-bold capitalize ${vue === v ? "bg-indigo text-white" : "bg-paper"}`}
                 >
                   <span className="w-8">
-                    <Apercu vue={v} couleurHex={couleurHex} forme={formePour(modele.nom, modele.sousFamille)} marquages={apercus} />
+                    <Apercu
+                      vue={v}
+                      couleurHex={couleurHex}
+                      forme={formePour(modele.nom, modele.sousFamille)}
+                      marquages={apercus}
+                      mockup={mockupPour(modele, v)}
+                      couleursZones={couleursZonesHex}
+                    />
                   </span>
                   {v}
                 </button>

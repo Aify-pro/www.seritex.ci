@@ -4,7 +4,8 @@ import {
   grammagesProposes,
   type ModeleCatalogue,
 } from "@/lib/catalogue-plateforme";
-import { placementPour, type TechniqueId } from "@/lib/marquage";
+import { type TechniqueId } from "@/lib/marquage";
+import { placementDe } from "@/lib/gabarit";
 
 /** Un marquage : un logo, un emplacement, une taille, une technique, et sa position ajustée par le client. */
 export type Marquage = {
@@ -28,6 +29,8 @@ export type Configuration = {
   couleurId: string;
   grammageId: string | null;
   quantite: string;
+  /** Couleur par zone (zone_key → couleur) ; null = couleur unique (couleurId) pour tout le vêtement. */
+  couleursZones: Record<string, string> | null;
   /** Répartition par taille, facultative (sinon Seritex propose la répartition au devis). */
   repartition: Record<string, string> | null;
   marquages: Marquage[];
@@ -38,7 +41,7 @@ export const nouvelId = () => `m${Date.now().toString(36)}${(compteur++).toStrin
 
 export function nouveauMarquage(m: ModeleCatalogue, emplacementId: string): Marquage {
   const z = m.emplacements.find((e) => e.id === emplacementId);
-  const p = z ? placementPour(z.cle, z.libelle) : null;
+  const p = z ? placementDe(m, z.id) : null;
   return { id: nouvelId(), emplacementId, logo: null, largeurCm: p?.defautCm ?? 9, technique: "serigraphie", consigne: "", dxCm: 0, dyCm: 0, rotation: 0, verrouille: false };
 }
 
@@ -50,6 +53,7 @@ export function configurationInitiale(m: ModeleCatalogue): Configuration {
     couleurId: couleur?.id ?? "",
     grammageId: grammage?.id ?? null,
     quantite: "",
+    couleursZones: null,
     repartition: null,
     marquages: m.emplacements[0] ? [nouveauMarquage(m, m.emplacements[0].id)] : [],
   };

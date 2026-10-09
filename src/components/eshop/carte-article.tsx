@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Apercu } from "@/components/personnaliser/apercu";
 import { formePour } from "@/lib/marquage";
+import { couleursDesZones, mockupPour } from "@/lib/gabarit";
 import { couleursProposees, MENTION_INDISPONIBLE, photoPour, slugModele, type ModeleCatalogue } from "@/lib/catalogue-plateforme";
 
 /** Carte d'un article dans la liste de l'e-shop. Aucun prix : le prix vient du devis. */
@@ -21,7 +22,14 @@ export function CarteArticle({ modele, personnaliser }: { modele: ModeleCatalogu
           <img src={photo} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className="block p-6">
-            <Apercu vue="face" couleurHex={couleurs[0]?.hex ?? "#FFFFFF"} forme={formePour(modele.nom, modele.sousFamille)} marquages={[]} />
+            <Apercu
+              vue="face"
+              couleurHex={couleurs[0]?.hex ?? "#FFFFFF"}
+              forme={formePour(modele.nom, modele.sousFamille)}
+              marquages={[]}
+              mockup={mockupPour(modele, "face")}
+              couleursZones={couleursDesZones(modele, couleurs[0]?.id ?? "", null)}
+            />
           </span>
         )}
         {modele.sousFamille ? (

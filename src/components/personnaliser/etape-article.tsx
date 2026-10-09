@@ -53,6 +53,54 @@ export function EtapeArticle({
         ) : null}
       </div>
 
+      {modele.zonesCouleur.length > 1 && couleurs.length > 0 ? (
+        <div>
+          <label className="flex min-h-11 items-center gap-3 font-display font-semibold">
+            <input
+              type="checkbox"
+              className="size-5 accent-indigo"
+              checked={!!config.couleursZones}
+              onChange={(e) =>
+                modifier({
+                  couleursZones: e.target.checked ? Object.fromEntries(modele.zonesCouleur.map((z) => [z.cle, config.couleurId])) : null,
+                })
+              }
+            />
+            Personnaliser les couleurs par zone ({modele.zonesCouleur.map((z) => z.libelle.toLowerCase()).join(", ")})
+          </label>
+          {config.couleursZones ? (
+            <ul className="mt-3 space-y-3 border-2 border-ink bg-ecru p-3">
+              {modele.zonesCouleur.map((z) => {
+                const choisie = config.couleursZones?.[z.cle] ?? config.couleurId;
+                return (
+                  <li key={z.cle}>
+                    <p className="font-mono text-xs tracking-wider uppercase">
+                      {z.libelle} · <span className="normal-case">{couleurs.find((c) => c.id === choisie)?.nom}</span>
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {couleurs.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          title={c.nom}
+                          aria-label={`${z.libelle} : ${c.nom}`}
+                          aria-pressed={c.id === choisie}
+                          onClick={() => modifier({ couleursZones: { ...config.couleursZones, [z.cle]: c.id } })}
+                          className={`size-8 rounded-full border-2 ${c.id === choisie ? "border-orange ring-2 ring-ink" : "border-ink"}`}
+                          style={{ background: c.hex ?? "#ccc" }}
+                        />
+                      ))}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="mt-1 text-sm text-muted">Par défaut, tout le vêtement est dans la couleur choisie ci-dessus.</p>
+          )}
+        </div>
+      ) : null}
+
       {grammages.length > 0 ? (
         <div>
           <Titre>Qualité du tissu</Titre>

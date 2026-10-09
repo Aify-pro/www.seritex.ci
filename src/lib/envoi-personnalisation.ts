@@ -51,6 +51,8 @@ export type EnvoiPersonnalisation = {
   coordonnees: Coordonnees;
   modele_id: string;
   couleur_id: string | null;
+  /** Couleur par zone (zone_key → couleur) ; null = couleur unique. */
+  couleurs_zones: Record<string, string> | null;
   textile_id: string | null;
   quantite: number;
   repartition: Record<string, number> | null;
@@ -146,6 +148,15 @@ export function nettoyerEnvoi(raw: unknown): EnvoiPersonnalisation | null {
     coordonnees,
     modele_id,
     couleur_id: id(r.couleur_id),
+    couleurs_zones: (() => {
+      const z = r.couleurs_zones && typeof r.couleurs_zones === "object" ? (r.couleurs_zones as Record<string, unknown>) : null;
+      if (!z) return null;
+      const propres = Object.entries(z)
+        .slice(0, 20)
+        .filter(([k, v]) => /^[\w-]{1,60}$/.test(k) && id(v))
+        .map(([k, v]) => [k, String(v)] as const);
+      return propres.length ? Object.fromEntries(propres) : null;
+    })(),
     textile_id: id(r.textile_id),
     quantite,
     repartition: repartition && Object.keys(repartition).length ? repartition : null,

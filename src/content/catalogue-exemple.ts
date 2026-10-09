@@ -5,6 +5,10 @@ import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
  * publiées sur la plateforme. Utilisé UNIQUEMENT si CATALOGUE_EXEMPLE=1
  * (jamais en production). Couleurs reprises du référentiel Seritex.
  */
+
+/** Mockup d'exemple (avant) : autres proportions que la silhouette standard, zones nommées comme sur la plateforme. */
+const MOCKUP_AVANT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 640"><defs><style>.cls-1{fill:#ffffff;stroke:#15163a;stroke-width:3}.cls-2{fill:#000;opacity:.07}</style></defs><g id="manche_gauche"><polygon class="cls-1" points="170,95 20,265 105,315 175,215"/></g><g id="manche_droite"><polygon class="cls-1" points="430,95 580,265 495,315 425,215"/></g><g id="corps_avant"><path class="cls-1" d="M170 95 L250 72 Q300 115 350 72 L430 95 L430 600 L170 600 Z"/></g><g id="col"><path class="cls-1" d="M250 72 Q300 128 350 72 L338 68 Q300 108 262 68 Z"/></g><path class="cls-2" d="M170 95 L215 95 L215 600 L170 600 Z"/></svg>`;
+
 const tailles = ["XS", "S", "M", "L", "XL", "XXL"].map((t) => ({ id: `t-${t}`, cle: t, libelle: t }));
 const couleur = (nom: string, hex: string, statut: "disponible" | "non_suivi" | "indisponible" = "disponible") => ({
   id: `c-${nom}`,
@@ -47,6 +51,23 @@ export const catalogueExemple: ModeleCatalogue[] = [
       { id: "z-nuque", cle: "nuque", libelle: "Nuque" },
     ],
     medias: [],
+    zonesCouleur: [
+      { cle: "corps_avant", libelle: "Corps avant" },
+      { cle: "corps_arriere", libelle: "Corps arrière" },
+      { cle: "col", libelle: "Col" },
+      { cle: "manche_gauche", libelle: "Manche gauche" },
+      { cle: "manche_droite", libelle: "Manche droite" },
+    ],
+    mockups: [
+      {
+        vue: "avant",
+        svg: MOCKUP_AVANT,
+        zones: { corps_avant: "corps_avant", col: "col", manche_gauche: "manche_gauche", manche_droite: "manche_droite" },
+        largeurCm: 56,
+        cadre: { x: 20, y: 68, w: 560, h: 532 },
+        reperes: { "z-poitrine": { x: 300, y: 250 }, "z-coeur": { x: 362, y: 185 } },
+      },
+    ],
   },
   {
     id: "exemple-polo",
@@ -65,5 +86,7 @@ export const catalogueExemple: ModeleCatalogue[] = [
       { id: "zp-dos", cle: "dos", libelle: "Dos" },
     ],
     medias: [],
+    zonesCouleur: [],
+    mockups: [],
   },
 ];

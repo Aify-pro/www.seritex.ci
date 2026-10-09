@@ -18,6 +18,18 @@ export type GrammageCatalogue = { id: string; nom: string; grammage: number | nu
 export type TailleCatalogue = { id: string; cle: string; libelle: string };
 export type EmplacementCatalogue = { id: string; cle: string; libelle: string };
 export type MediaCatalogue = { url: string; couleurId: string | null; principale: boolean };
+export type ZoneCouleurCatalogue = { cle: string; libelle: string };
+/** Mockup SVG d'une vue (plateforme, migration 0121) : SVG nettoyé, calques → zones, calibrage, repères. */
+export type MockupCatalogue = {
+  vue: "avant" | "dos";
+  svg: string;
+  /** id d'élément du SVG → zone_key, ou « __contour » (forme du vêtement sans couleur propre). */
+  zones: Record<string, string>;
+  largeurCm: number;
+  cadre: { x: number; y: number; w: number; h: number };
+  /** id de zone d'impression → position dans le SVG. */
+  reperes: Record<string, { x: number; y: number }>;
+};
 
 export type ModeleCatalogue = {
   id: string;
@@ -34,6 +46,9 @@ export type ModeleCatalogue = {
   tailles: TailleCatalogue[];
   emplacements: EmplacementCatalogue[];
   medias: MediaCatalogue[];
+  /** Zones de couleur (corps, col, manches…) : vide ou « uni » = couleur unique seulement. */
+  zonesCouleur: ZoneCouleurCatalogue[];
+  mockups: MockupCatalogue[];
 };
 
 /** Mention affichée à la place d'un article ou d'une couleur indisponible (même texte que la plateforme). */
@@ -53,6 +68,8 @@ type LigneSql = {
   tailles: TailleCatalogue[];
   emplacements: EmplacementCatalogue[];
   medias: { path: string; color_id: string | null; principale: boolean }[];
+  zones_couleur?: ZoneCouleurCatalogue[];
+  mockups?: { vue: "avant" | "dos"; svg: string; zones: Record<string, string>; largeur_cm: number | string; cadre: MockupCatalogue["cadre"]; reperes: MockupCatalogue["reperes"] }[];
 };
 
 const DUREE_LIENS_PHOTOS = 3600;
@@ -105,6 +122,15 @@ async function chargerCatalogue(): Promise<ModeleCatalogue[]> {
     disponibilites: l.disponibilites.map((d) => ({ grammageId: d.textile_id, couleurId: d.color_id, statut: d.statut })),
     tailles: l.tailles,
     emplacements: l.emplacements,
+    zonesCouleur: (l.zones_couleur ?? []).filter((z) => z.cle !== "uni"),
+    mockups: (l.mockups ?? []).map((mk) => ({
+      vue: mk.vue,
+      svg: mk.svg,
+      zones: mk.zones ?? {},
+      largeurCm: Number(mk.largeur_cm),
+      cadre: { x: Number(mk.cadre.x), y: Number(mk.cadre.y), w: Number(mk.cadre.w), h: Number(mk.cadre.h) },
+      reperes: mk.reperes ?? {},
+    })),
     medias: l.medias.flatMap((m) => {
       const lien = liens.get(m.path);
       return lien ? [{ url: lien, couleurId: m.color_id, principale: m.principale }] : [];

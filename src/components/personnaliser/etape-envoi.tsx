@@ -6,7 +6,8 @@ import { AlertTriangle, CheckCircle2, Download, FileImage, Lightbulb, Loader2, S
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
 import { validerCoordonnees, type Coordonnees, type ErreursCoordonnees, type FichierDepose, type MarquageEnvoye } from "@/lib/envoi-personnalisation";
 import { imageMaquette, pdfMaquette, telecharger, type ContenuMaquette } from "@/lib/maquette";
-import { controler, debordeDuVetement, decrirePosition, formatCm, getTechnique, placementPour, rapportMarquage, techniqueAvecArticle } from "@/lib/marquage";
+import { controler, debordeDuVetement, decrirePosition, formatCm, getTechnique, rapportMarquage, techniqueAvecArticle } from "@/lib/marquage";
+import { couleurSousMarquage, mockupPour, placementDe, viewBoxDe } from "@/lib/gabarit";
 import { Apercu, cadragePour, formePour, type MarquageApercu } from "./apercu";
 import type { Configuration, Marquage } from "./etat";
 import { libelleEmplacement } from "./etape-marquage";
@@ -30,6 +31,7 @@ export function EtapeEnvoi({
   grammage,
   total,
   apercus,
+  couleursZonesHex,
   setMarquages,
 }: {
   modele: ModeleCatalogue;
@@ -39,6 +41,7 @@ export function EtapeEnvoi({
   grammage: string | null;
   total: number;
   apercus: MarquageApercu[];
+  couleursZonesHex: Record<string, string>;
   setMarquages: (m: Marquage[]) => void;
 }) {
   const face = useRef<SVGSVGElement>(null);
@@ -55,11 +58,16 @@ export function EtapeEnvoi({
   const aDos = sansCadre.some((a) => a.placement.vue === "dos");
 
   const premium = forme === "polo";
+  // « Col : Rouge vif · Manche gauche : Blanc… » quand le client a personnalisé les zones.
+  const couleursParZone = config.couleursZones
+    ? modele.zonesCouleur
+        .map((z) => `${z.libelle} : ${modele.couleurs.find((c) => c.id === config.couleursZones?.[z.cle])?.nom ?? couleur}`)
+        .join(" · ")
+    : null;
   const marquagesDetail = config.marquages.map((m, i) => {
     const alertes = m.logo ? controler(m.logo.analyse, m.technique, m.largeurCm, couleurHex).filter((c) => c.statut !== "ok").map((c) => c.titre) : [];
     const libelle = libelleEmplacement(modele, m.emplacementId);
-    const zone = modele.emplacements.find((e) => e.id === m.emplacementId);
-    const placement = placementPour(zone?.cle ?? "", zone?.libelle ?? "");
+    const placement = placementDe(modele, m.emplacementId);
     const vue = placement.vue;
     // « Poitrine — avant » ; inutile quand l'emplacement le dit déjà (« Dos », « Manche D », « Nuque »).
     const emplacement = /manche|dos|nuque/i.test(libelle) ? libelle : `${libelle} — ${vue === "face" ? "avant" : "dos"}`;
@@ -70,7 +78,8 @@ export function EtapeEnvoi({
           technique: m.technique,
           largeurCm: m.largeurCm,
           quantite: total,
-          couleurTextile: { nom: couleur, hex: couleurHex },
+          // Couleurs par zone : le tissu réellement sous le visuel (corps avant ou arrière).
+          couleurTextile: couleurSousMarquage(modele, vue, config.couleurId, config.couleursZones),
           premium,
           formatHabituelCm: placement.maxCm,
           deborde: debordeDuVetement(placement, m.largeurCm, m.logo.analyse.analysable ? m.logo.analyse.ratio : 0.6, m.dxCm, m.dyCm, m.rotation),
@@ -92,9 +101,11 @@ export function EtapeEnvoi({
             }}
             vue={apercu.placement.vue}
             couleurHex={couleurHex}
+            mockup={mockupPour(modele, apercu.placement.vue)}
+            couleursZones={couleursZonesHex}
             forme={forme}
             marquages={sansCadre}
-            cadrage={cadragePour(apercu)}
+            cadrage={cadragePour(apercu, viewBoxDe(mockupPour(modele, apercu.placement.vue)))}
             cotes
           />
         </div>
@@ -111,6 +122,7 @@ export function EtapeEnvoi({
       article: [
         { libelle: "Article", valeur: modele.nom },
         { libelle: "Couleur", valeur: couleur },
+        ...(couleursParZone ? [{ libelle: "Couleurs par zone", valeur: couleursParZone }] : []),
         ...(grammage ? [{ libelle: "Tissu", valeur: grammage }] : []),
         {
           libelle: "Quantité",
@@ -219,6 +231,7 @@ export function EtapeEnvoi({
           coordonnees: coord,
           modele_id: modele.id,
           couleur_id: config.couleurId || null,
+          couleurs_zones: config.couleursZones,
           textile_id: config.grammageId,
           quantite: total,
           repartition: config.repartition
@@ -281,8 +294,8 @@ export function EtapeEnvoi({
         </button>
         {/* Les vues restent montées pour pouvoir régénérer la maquette. */}
         <div className="sr-only" aria-hidden>
-          <Apercu ref={face} vue="face" couleurHex={couleurHex} forme={forme} marquages={sansCadre} />
-          {aDos ? <Apercu ref={dos} vue="dos" couleurHex={couleurHex} forme={forme} marquages={sansCadre} /> : null}
+          <Apercu ref={face} vue="face" couleurHex={couleurHex} forme={forme} marquages={sansCadre} mockup={mockupPour(modele, "face")} couleursZones={couleursZonesHex} />
+          {aDos ? <Apercu ref={dos} vue="dos" couleurHex={couleurHex} forme={forme} marquages={sansCadre} mockup={mockupPour(modele, "dos")} couleursZones={couleursZonesHex} /> : null}
           {grosPlans(true)}
         </div>
       </div>
@@ -303,12 +316,12 @@ export function EtapeEnvoi({
 
       <div className={`grid gap-3 ${aDos ? "grid-cols-2" : "max-w-xs grid-cols-1"}`}>
         <figure className="border-2 border-ink bg-ecru p-2">
-          <Apercu ref={face} vue="face" couleurHex={couleurHex} forme={forme} marquages={sansCadre} />
+          <Apercu ref={face} vue="face" couleurHex={couleurHex} forme={forme} marquages={sansCadre} mockup={mockupPour(modele, "face")} couleursZones={couleursZonesHex} />
           <figcaption className="font-mono text-xs tracking-wider uppercase">Avant</figcaption>
         </figure>
         {aDos ? (
           <figure className="border-2 border-ink bg-ecru p-2">
-            <Apercu ref={dos} vue="dos" couleurHex={couleurHex} forme={forme} marquages={sansCadre} />
+            <Apercu ref={dos} vue="dos" couleurHex={couleurHex} forme={forme} marquages={sansCadre} mockup={mockupPour(modele, "dos")} couleursZones={couleursZonesHex} />
             <figcaption className="font-mono text-xs tracking-wider uppercase">Dos</figcaption>
           </figure>
         ) : null}
@@ -319,6 +332,12 @@ export function EtapeEnvoi({
         <dd className="font-semibold">{modele.nom}</dd>
         <dt className="font-mono text-xs tracking-wider uppercase">Couleur</dt>
         <dd>{couleur}</dd>
+        {couleursParZone ? (
+          <>
+            <dt className="font-mono text-xs tracking-wider uppercase">Par zone</dt>
+            <dd>{couleursParZone}</dd>
+          </>
+        ) : null}
         {grammage ? (
           <>
             <dt className="font-mono text-xs tracking-wider uppercase">Tissu</dt>
