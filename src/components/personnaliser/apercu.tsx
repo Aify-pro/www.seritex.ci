@@ -20,6 +20,26 @@ export type MarquageApercu = {
 export type ModificationMarquage = Partial<{ dxCm: number; dyCm: number; largeurCm: number; rotation: number }>;
 
 export { formePour, type Forme } from "@/lib/marquage";
+
+/**
+ * Cadrage « gros plan » autour d'un marquage (viewBox), aux proportions de
+ * l'aperçu complet (400 × 440), avec la place des cotes.
+ */
+export function cadragePour(m: MarquageApercu): [number, number, number, number] {
+  const w = m.largeurCm * UNITES_PAR_CM;
+  const h = w * m.ratio;
+  const a = (m.rotation * Math.PI) / 180;
+  const demiL = (Math.abs(w * Math.cos(a)) + Math.abs(h * Math.sin(a))) / 2;
+  const demiH = (Math.abs(w * Math.sin(a)) + Math.abs(h * Math.cos(a))) / 2;
+  const cx = m.placement.x + m.dxCm * UNITES_PAR_CM;
+  const cy = m.placement.y + m.dyCm * UNITES_PAR_CM;
+  // Assez large pour garder le vêtement autour du marquage (épaules, col, manche).
+  const largeur = Math.min(400, Math.max(170, demiL * 2 * 2.4 + 50, ((demiH * 2 * 2.4 + 50) * 400) / 440));
+  const hauteur = (largeur * 440) / 400;
+  const x = Math.min(Math.max(cx - largeur / 2, 0), 400 - largeur);
+  const y = Math.min(Math.max(cy - hauteur / 2, 0), 440 - hauteur);
+  return [x, y, largeur, hauteur];
+}
 const CORPS =
   "M140,40 L70,62 L5,150 L60,185 L100,150 L100,420 L300,420 L300,150 L340,185 L395,150 L330,62 L260,40";
 const COL_FACE = "Q200,78 140,40";
@@ -56,8 +76,14 @@ export const Apercu = forwardRef<
     marquages: MarquageApercu[];
     onModifier?: (id: string, patch: ModificationMarquage) => void;
     onSelectionner?: (id: string) => void;
+    /** Gros plan : viewBox [x, y, largeur, hauteur] (voir cadragePour). */
+    cadrage?: [number, number, number, number];
+    /** Affiche les cotes (largeur × hauteur en cm) des marquages visibles. */
+    cotes?: boolean;
   }
->(function Apercu({ vue, couleurHex, forme, marquages, onModifier, onSelectionner }, ref) {
+>(function Apercu({ vue, couleurHex, forme, marquages, onModifier, onSelectionner, cadrage, cotes = false }, ref) {
+  // Échelle des traits et des textes : constants à l'écran, même en gros plan.
+  const k = cadrage ? cadrage[2] / 400 : 1;
   const gid = `volume-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const svgInterne = useRef<SVGSVGElement | null>(null);
   const geste = useRef<Geste | null>(null);
@@ -147,7 +173,7 @@ export const Apercu = forwardRef<
     <svg
       ref={lierRef}
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 400 440"
+      viewBox={cadrage ? cadrage.join(" ") : "0 0 400 440"}
       role="img"
       aria-label={`Aperçu ${vue === "face" ? "de face" : "de dos"}`}
       className="h-auto w-full select-none"
@@ -209,6 +235,30 @@ export const Apercu = forwardRef<
               ) : (
                 <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="rgb(255 255 255 / 0.35)" stroke="#15163a" strokeDasharray="3 3" />
               )}
+              {cotes ? (
+                <g stroke="#e2162d" fill="#e2162d" strokeWidth={1.2 * k} fontFamily="var(--font-mono-jb), 'JetBrains Mono', Menlo, Consolas, monospace" fontSize={11 * k}>
+                  <line x1={-w / 2} y1={h / 2 + 10 * k} x2={w / 2} y2={h / 2 + 10 * k} />
+                  <line x1={-w / 2} y1={h / 2 + 5 * k} x2={-w / 2} y2={h / 2 + 15 * k} />
+                  <line x1={w / 2} y1={h / 2 + 5 * k} x2={w / 2} y2={h / 2 + 15 * k} />
+                  <text x={0} y={h / 2 + 26 * k} textAnchor="middle" stroke="#fffdf8" strokeWidth={3 * k} paintOrder="stroke">
+                    {formatCm(m.largeurCm)}
+                  </text>
+                  <line x1={w / 2 + 10 * k} y1={-h / 2} x2={w / 2 + 10 * k} y2={h / 2} />
+                  <line x1={w / 2 + 5 * k} y1={-h / 2} x2={w / 2 + 15 * k} y2={-h / 2} />
+                  <line x1={w / 2 + 5 * k} y1={h / 2} x2={w / 2 + 15 * k} y2={h / 2} />
+                  <text
+                    x={w / 2 + 22 * k}
+                    y={0}
+                    textAnchor="middle"
+                    transform={`rotate(-90 ${w / 2 + 22 * k} 0)`}
+                    stroke="#fffdf8"
+                    strokeWidth={3 * k}
+                    paintOrder="stroke"
+                  >
+                    {formatCm(Math.round(m.largeurCm * m.ratio * 10) / 10)}
+                  </text>
+                </g>
+              ) : null}
               {poignees || (m.actif && !interactif) ? (
                 <rect x={-w / 2 - 3} y={-h / 2 - 3} width={w + 6} height={h + 6} fill="none" stroke="#f28c1b" strokeWidth="1.5" strokeDasharray="5 3" />
               ) : null}
@@ -249,7 +299,7 @@ export const Apercu = forwardRef<
                 y={cy - demiHaut - (poignees ? 36 : 8)}
                 textAnchor="middle"
                 fontSize="11"
-                fontFamily="var(--font-mono-jb), monospace"
+                fontFamily="var(--font-mono-jb), 'JetBrains Mono', Menlo, Consolas, monospace"
                 fill="#15163a"
                 stroke="#fffdf8"
                 strokeWidth="3"
