@@ -36,6 +36,7 @@ export async function POST(request: Request) {
         ...envoi.coordonnees,
         modele_id: envoi.modele_id,
         couleur_id: envoi.couleur_id,
+        couleurs_zones: envoi.couleurs_zones,
         textile_id: envoi.textile_id,
         quantite: String(envoi.quantite),
         repartition: envoi.repartition,

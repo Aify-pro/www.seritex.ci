@@ -4,7 +4,8 @@ import { useRef, useState, type DragEvent } from "react";
 import { ArrowDown, ArrowUp, Crosshair, FileImage, Layers, Loader2, Lock, LockOpen, Plus, Trash2, Upload } from "lucide-react";
 import { chargerLogo, FORMATS_ACCEPTES, TAILLE_MAX_OCTETS } from "@/lib/analyse-logo";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
-import { bornerDecalage, decrirePosition, FORMATS, formatCm, placementPour, TAILLE_MAX_CM, TAILLE_MIN_CM, TECHNIQUES } from "@/lib/marquage";
+import { bornerDecalage, decrirePosition, FORMATS, formatCm, TAILLE_MAX_CM, TAILLE_MIN_CM, TECHNIQUES } from "@/lib/marquage";
+import { placementDe } from "@/lib/gabarit";
 import { nouveauMarquage, type Marquage } from "./etat";
 import { Puce, Titre } from "./ui";
 
@@ -35,8 +36,7 @@ export function EtapeMarquage({
     return <p className="text-muted">Ce modèle n&apos;a pas encore d&apos;emplacement de marquage : décrivez votre besoin à votre conseiller.</p>;
   }
 
-  const zone = modele.emplacements.find((e) => e.id === actif.emplacementId);
-  const placement = placementPour(zone?.cle ?? "", zone?.libelle ?? "");
+  const placement = placementDe(modele, actif.emplacementId);
   const MAX_VISUELS = 8;
   const autresLogos = marquages.filter((m) => m.id !== actif.id && m.logo && m.logo !== actif.logo);
 
@@ -258,12 +258,12 @@ export function EtapeMarquage({
               key={e.id}
               choisie={e.id === actif.emplacementId}
               onClick={() => {
-                const p = placementPour(e.cle, e.libelle);
+                const p = placementDe(modele, e.id);
                 // Nouvel emplacement : taille type, logo recentré et droit.
                 maj({ emplacementId: e.id, largeurCm: p.defautCm, dxCm: 0, dyCm: 0, rotation: 0 });
               }}
             >
-              {e.libelle} · {placementPour(e.cle, e.libelle).vue}
+              {e.libelle} · {placementDe(modele, e.id).vue}
             </Puce>
           ))}
         </div>

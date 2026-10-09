@@ -87,7 +87,20 @@ export const formePour = (nom: string, famille: string | null): Forme =>
  * de x = 100 à 300 ≈ 52 cm de large), format habituel (`maxCm`, au-delà le
  * conseiller vérifie la faisabilité) et taille proposée par défaut.
  */
-export type Placement = { vue: Vue; x: number; y: number; maxCm: number; defautCm: number };
+export type Placement = {
+  vue: Vue;
+  x: number;
+  y: number;
+  maxCm: number;
+  defautCm: number;
+  /** Mockup de la plateforme : unités du SVG par cm (sinon UNITES_PAR_CM de la silhouette standard). */
+  echelle?: number;
+  /** Mockup : cadre du vêtement [x0, y0, x1, y1] dans le SVG (sinon la silhouette standard). */
+  cadre?: [number, number, number, number];
+};
+
+/** Unités du dessin par centimètre de vêtement, pour ce placement. */
+export const echelleDe = (p: Placement) => p.echelle ?? UNITES_PAR_CM;
 
 /** Taille de marquage : libre entre ces bornes ; ce qui dépasse du vêtement n'est pas imprimé. */
 export const TAILLE_MIN_CM = 2;
@@ -110,10 +123,11 @@ const dansSilhouette = ([x, y]: [number, number]) => {
 
 /** Le visuel (incliné compris) sort-il du vêtement ? Contrôle sur les bords du visuel. */
 export function debordeDuVetement(p: Placement, largeurCm: number, ratio: number, dxCm: number, dyCm: number, rotation: number): boolean {
-  const w = largeurCm * UNITES_PAR_CM;
+  const u = echelleDe(p);
+  const w = largeurCm * u;
   const h = w * ratio;
-  const cx = p.x + dxCm * UNITES_PAR_CM;
-  const cy = p.y + dyCm * UNITES_PAR_CM;
+  const cx = p.x + dxCm * u;
+  const cy = p.y + dyCm * u;
   const a = (rotation * Math.PI) / 180;
   const points: [number, number][] = [];
   for (const fx of [-0.5, -0.25, 0, 0.25, 0.5])
@@ -123,6 +137,11 @@ export function debordeDuVetement(p: Placement, largeurCm: number, ratio: number
       const ly = fy * h;
       points.push([cx + lx * Math.cos(a) - ly * Math.sin(a), cy + lx * Math.sin(a) + ly * Math.cos(a)]);
     }
+  // Mockup : contrôle sur le cadre du vêtement (approché) ; silhouette standard : contour exact.
+  if (p.cadre) {
+    const [x0, y0, x1, y1] = p.cadre;
+    return points.some(([x, y]) => x < x0 || x > x1 || y < y0 || y > y1);
+  }
   return points.some((pt) => !dansSilhouette(pt));
 }
 
@@ -162,11 +181,12 @@ export function placementPour(cle: string, libelle: string): Placement {
  * vêtement est masqué à l'aperçu et signalé.
  */
 export function bornerDecalage(p: Placement, dxCm: number, dyCm: number): { dxCm: number; dyCm: number } {
-  const [x0, y0, x1, y1] = [5, 40, 395, 420];
-  const x = Math.min(x1, Math.max(x0, p.x + dxCm * UNITES_PAR_CM));
-  const y = Math.min(y1, Math.max(y0, p.y + dyCm * UNITES_PAR_CM));
+  const [x0, y0, x1, y1] = p.cadre ?? [5, 40, 395, 420];
+  const u = echelleDe(p);
+  const x = Math.min(x1, Math.max(x0, p.x + dxCm * u));
+  const y = Math.min(y1, Math.max(y0, p.y + dyCm * u));
   const arrondi = (v: number) => Math.round(v * 2) / 2;
-  return { dxCm: arrondi((x - p.x) / UNITES_PAR_CM), dyCm: arrondi((y - p.y) / UNITES_PAR_CM) };
+  return { dxCm: arrondi((x - p.x) / u), dyCm: arrondi((y - p.y) / u) };
 }
 
 /** Inclinaison ramenée entre -180° et 180°. */
