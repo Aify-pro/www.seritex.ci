@@ -6,7 +6,7 @@ import { CheckCircle2, Download, FileImage, Loader2, Send } from "lucide-react";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
 import { validerCoordonnees, type Coordonnees, type ErreursCoordonnees, type FichierDepose, type MarquageEnvoye } from "@/lib/envoi-personnalisation";
 import { imageMaquette, pdfMaquette, telecharger, type ContenuMaquette } from "@/lib/maquette";
-import { controler, formatCm, getTechnique } from "@/lib/marquage";
+import { controler, decrirePosition, formatCm, getTechnique } from "@/lib/marquage";
 import { Apercu, formePour, type MarquageApercu } from "./apercu";
 import type { Configuration } from "./etat";
 import { libelleEmplacement } from "./etape-marquage";
@@ -82,6 +82,7 @@ export function EtapeEnvoi({
         details: [
           m.logo ? `Fichier : ${m.logo.nom}` : "Logo à transmettre au conseiller",
           m.logo?.analyse.analysable ? (m.logo.analyse.degrade ? "dégradés détectés" : `${m.logo.analyse.couleurs.length} couleur(s)`) : null,
+          decrirePosition(m.dxCm, m.dyCm, m.rotation) || null,
           m.consigne ? `« ${m.consigne} »` : null,
         ]
           .filter(Boolean)
@@ -161,6 +162,9 @@ export function EtapeEnvoi({
         degrade: !!m.logo?.analyse.degrade,
         consigne: m.consigne,
         alertes,
+        decalage_x_cm: m.dxCm,
+        decalage_y_cm: m.dyCm,
+        rotation_deg: m.rotation,
       }));
       const res = await fetch("/api/personnaliser/envoyer", {
         method: "POST",
@@ -280,6 +284,7 @@ export function EtapeEnvoi({
             <dd>
               {libelle} · {formatCm(m.largeurCm)} · {getTechnique(m.technique).label}
               {m.logo ? ` · ${m.logo.nom}` : " · logo à transmettre"}
+              {decrirePosition(m.dxCm, m.dyCm, m.rotation) ? ` · ${decrirePosition(m.dxCm, m.dyCm, m.rotation)}` : ""}
               {alertes.length ? <span className="block text-xs text-muted">À vérifier avec votre conseiller : {alertes.join(" ; ")}</span> : null}
             </dd>
           </div>

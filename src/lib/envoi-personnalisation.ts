@@ -31,6 +31,10 @@ export type MarquageEnvoye = {
   degrade: boolean;
   consigne: string;
   alertes: string[];
+  /** Position ajustée par le client sur l'aperçu : décalage du centre (cm, droite / bas) et inclinaison (degrés). */
+  decalage_x_cm: number;
+  decalage_y_cm: number;
+  rotation_deg: number;
 };
 
 export type Coordonnees = {
@@ -86,6 +90,7 @@ export function nettoyerEnvoi(raw: unknown): EnvoiPersonnalisation | null {
   const envoi_id = s(r.envoi_id, 36);
   const modele_id = s(r.modele_id, 36);
   if (!UUID.test(envoi_id) || !UUID.test(modele_id)) return null;
+  const borne = (v: unknown, min: number, max: number) => Math.min(max, Math.max(min, Number(v) || 0));
   const id = (v: unknown) => (UUID.test(String(v ?? "")) ? String(v) : null);
   const quantite = Math.floor(Number(r.quantite));
   if (!Number.isFinite(quantite) || quantite < 1 || quantite > 1_000_000) return null;
@@ -115,6 +120,9 @@ export function nettoyerEnvoi(raw: unknown): EnvoiPersonnalisation | null {
         degrade: !!x.degrade,
         consigne: s(x.consigne, 600),
         alertes: (Array.isArray(x.alertes) ? x.alertes : []).slice(0, 8).map((a) => s(a, 120)),
+        decalage_x_cm: borne(x.decalage_x_cm, -40, 40),
+        decalage_y_cm: borne(x.decalage_y_cm, -60, 60),
+        rotation_deg: Math.round(borne(x.rotation_deg, -180, 180)),
       },
     ];
   });

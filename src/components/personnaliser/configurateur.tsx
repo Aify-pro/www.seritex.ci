@@ -62,6 +62,9 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
         ratio: m.logo?.analyse.analysable ? m.logo.analyse.ratio : 0.6,
         apercuUrl: m.logo?.apercuUrl ?? null,
         actif: etape === 1 && m.id === actifId,
+        dxCm: m.dxCm,
+        dyCm: m.dyCm,
+        rotation: m.rotation,
       },
     ];
   });
@@ -136,7 +139,20 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
           <div className="sticky top-24 space-y-3">
             <div className="relative border-2 border-ink bg-[radial-gradient(circle_at_50%_35%,#fffdf8,#ebe3d1)] p-4">
               <span className="absolute top-3 left-3 bg-ink px-2 py-1 font-mono text-xs tracking-wider text-ecru uppercase">{vue}</span>
-              <Apercu vue={vue} couleurHex={couleurHex} forme={formePour(modele.nom, modele.sousFamille)} marquages={apercus} />
+              <Apercu
+                vue={vue}
+                couleurHex={couleurHex}
+                forme={formePour(modele.nom, modele.sousFamille)}
+                marquages={apercus}
+                // Étape « Logo & emplacement » : le logo se déplace, se redimensionne et s'incline directement ici.
+                onModifier={
+                  etape === 1
+                    ? // Mise à jour fonctionnelle : les gestes rapides (glisser, touches répétées) partent toujours du dernier état.
+                      (id, patch) => setConfig((c) => ({ ...c, marquages: c.marquages.map((m) => (m.id === id ? { ...m, ...patch } : m)) }))
+                    : undefined
+                }
+                onSelectionner={etape === 1 ? setActif : undefined}
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
               {(["face", "dos"] as const).map((v) => (
@@ -163,6 +179,12 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
                   </span>
                 ))}
             </p>
+            {etape === 1 && config.marquages.length > 0 ? (
+              <p className="border-2 border-dashed border-ink bg-orange/15 p-3 text-sm">
+                <strong className="font-display">Ajustez votre logo ici :</strong> glissez-le pour le placer, tirez le carré orange pour la taille,
+                le rond du haut pour l&apos;incliner (Maj : par 15°).
+              </p>
+            ) : null}
             <p className="text-xs text-muted">Aperçu indicatif, à l&apos;échelle d&apos;un adulte taille M. Le rendu final est validé sur BAT.</p>
             {photos.length > 0 ? (
               <div>

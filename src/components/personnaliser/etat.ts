@@ -6,7 +6,7 @@ import {
 } from "@/lib/catalogue-plateforme";
 import { placementPour, type TechniqueId } from "@/lib/marquage";
 
-/** Un marquage : un logo, un emplacement, une taille, une technique. */
+/** Un marquage : un logo, un emplacement, une taille, une technique, et sa position ajustée par le client. */
 export type Marquage = {
   id: string;
   emplacementId: string;
@@ -14,6 +14,11 @@ export type Marquage = {
   largeurCm: number;
   technique: TechniqueId;
   consigne: string;
+  /** Décalage du centre par rapport à la position type de l'emplacement (cm, vers la droite / vers le bas de l'aperçu). */
+  dxCm: number;
+  dyCm: number;
+  /** Inclinaison en degrés (sens horaire), de -180 à 180. */
+  rotation: number;
 };
 
 export type Configuration = {
@@ -32,7 +37,7 @@ export const nouvelId = () => `m${Date.now().toString(36)}${(compteur++).toStrin
 export function nouveauMarquage(m: ModeleCatalogue, emplacementId: string): Marquage {
   const z = m.emplacements.find((e) => e.id === emplacementId);
   const p = z ? placementPour(z.cle, z.libelle) : null;
-  return { id: nouvelId(), emplacementId, logo: null, largeurCm: p?.defautCm ?? 9, technique: "serigraphie", consigne: "" };
+  return { id: nouvelId(), emplacementId, logo: null, largeurCm: p?.defautCm ?? 9, technique: "serigraphie", consigne: "", dxCm: 0, dyCm: 0, rotation: 0 };
 }
 
 export function configurationInitiale(m: ModeleCatalogue): Configuration {
