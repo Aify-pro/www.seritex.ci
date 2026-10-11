@@ -20,6 +20,8 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
   const [vue, setVue] = useState<Vue>("face");
   const [actifId, setActifId] = useState(config.marquages[0]?.id ?? "");
   const haut = useRef<HTMLDivElement>(null);
+  // Zone de couleur dont la palette est ouverte (onglet), partagée avec l'aperçu.
+  const [zoneActive, setZoneActive] = useState<string | null>(null);
 
   function allerA(i: number) {
     setEtape(i);
@@ -36,6 +38,18 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
   const photos = modele.medias.filter((p) => p.couleurId === null || p.couleurId === config.couleurId);
 
   const modifier = (patch: Partial<Configuration>) => setConfig((c) => ({ ...c, ...patch }));
+
+  /**
+   * Ouvre la palette d'une zone (onglet ou clic sur le dessin) : active au
+   * besoin les couleurs par zone, et montre la face du vêtement où elle se trouve.
+   */
+  function choisirZone(cle: string | null) {
+    setZoneActive(cle);
+    if (!cle) return;
+    if (!config.couleursZones) modifier({ couleursZones: Object.fromEntries(modele.zonesCouleur.map((z) => [z.cle, config.couleurId])) });
+    const mk = modele.mockups.find((m) => Object.values(m.zones).includes(cle));
+    if (mk) setVue(mk.vue === "avant" ? "face" : "dos");
+  }
 
   function setMarquages(marquages: Marquage[]) {
     modifier({ marquages });
@@ -97,7 +111,7 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
       <div className="mt-8 grid gap-8 lg:grid-cols-12">
         <div className="border-2 border-ink bg-paper p-5 shadow-hard sm:p-8 lg:col-span-7">
           {etape === 0 ? (
-            <EtapeArticle modele={modele} config={config} modifier={modifier} />
+            <EtapeArticle modele={modele} config={config} modifier={modifier} zoneActive={zoneActive} choisirZone={choisirZone} />
           ) : etape === 1 ? (
             <EtapeMarquage modele={modele} marquages={config.marquages} actifId={actifId} setActif={setActif} setMarquages={setMarquages} />
           ) : (
@@ -147,6 +161,9 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
                 couleurHex={couleurHex}
                 mockup={mockupPour(modele, vue)}
                 couleursZones={couleursZonesHex}
+                // Étape 1 : un clic sur une zone du vêtement ouvre sa palette.
+                zoneActive={etape === 0 && config.couleursZones ? zoneActive : null}
+                onChoisirZone={etape === 0 && modele.zonesCouleur.length > 1 ? choisirZone : undefined}
                 forme={formePour(modele.nom, modele.sousFamille)}
                 marquages={apercus}
                 // Étape « Logo & emplacement » : le logo se déplace, se redimensionne et s'incline directement ici.
