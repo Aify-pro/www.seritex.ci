@@ -10,10 +10,15 @@ export function EtapeArticle({
   modele,
   config,
   modifier,
+  zoneActive,
+  choisirZone,
 }: {
   modele: ModeleCatalogue;
   config: Configuration;
   modifier: (patch: Partial<Configuration>) => void;
+  /** Zone dont la palette est ouverte (onglet actif) ; partagée avec l'aperçu (clic sur une zone du dessin). */
+  zoneActive: string | null;
+  choisirZone: (cle: string | null) => void;
 }) {
   const couleurs = couleursProposees(modele);
   const indisponibles = modele.couleurs.filter((c) => c.statut === "indisponible");
@@ -60,43 +65,66 @@ export function EtapeArticle({
               type="checkbox"
               className="size-5 accent-indigo"
               checked={!!config.couleursZones}
-              onChange={(e) =>
+              onChange={(e) => {
                 modifier({
                   couleursZones: e.target.checked ? Object.fromEntries(modele.zonesCouleur.map((z) => [z.cle, config.couleurId])) : null,
-                })
-              }
+                });
+                choisirZone(e.target.checked ? modele.zonesCouleur[0].cle : null);
+              }}
             />
-            Personnaliser les couleurs par zone ({modele.zonesCouleur.map((z) => z.libelle.toLowerCase()).join(", ")})
+            Personnaliser les couleurs par zone
           </label>
           {config.couleursZones ? (
-            <ul className="mt-3 space-y-3 border-2 border-ink bg-ecru p-3">
-              {modele.zonesCouleur.map((z) => {
-                const choisie = config.couleursZones?.[z.cle] ?? config.couleurId;
-                return (
-                  <li key={z.cle}>
-                    <p className="font-mono text-xs tracking-wider uppercase">
-                      {z.libelle} · <span className="normal-case">{couleurs.find((c) => c.id === choisie)?.nom}</span>
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {couleurs.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          title={c.nom}
-                          aria-label={`${z.libelle} : ${c.nom}`}
-                          aria-pressed={c.id === choisie}
-                          onClick={() => modifier({ couleursZones: { ...config.couleursZones, [z.cle]: c.id } })}
-                          className={`size-8 rounded-full border-2 ${c.id === choisie ? "border-orange ring-2 ring-ink" : "border-ink"}`}
-                          style={{ background: c.hex ?? "#ccc" }}
+            <div className="mt-3 border-2 border-ink bg-ecru">
+              {/* Onglets : une zone à la fois ; la pastille montre sa couleur actuelle. */}
+              <div role="tablist" aria-label="Zones du vêtement" className="flex flex-wrap gap-1 border-b-2 border-ink p-2">
+                {modele.zonesCouleur.map((z) => {
+                  const c = couleurs.find((x) => x.id === (config.couleursZones?.[z.cle] ?? config.couleurId));
+                  const actif = z.cle === zoneActive;
+                  return (
+                    <button
+                      key={z.cle}
+                      type="button"
+                      role="tab"
+                      aria-selected={actif}
+                      onClick={() => choisirZone(actif ? null : z.cle)}
+                      className={`inline-flex min-h-10 items-center gap-2 border-2 px-3 font-display text-sm font-semibold ${
+                        actif ? "border-ink bg-ink text-ecru" : "border-transparent hover:border-ink"
+                      }`}
+                    >
+                      <span className="size-4 shrink-0 rounded-full border border-current" style={{ background: c?.hex ?? "#ccc" }} />
+                      {z.libelle}
+                    </button>
+                  );
+                })}
+              </div>
+              {zoneActive && modele.zonesCouleur.some((z) => z.cle === zoneActive) ? (
+                <div role="tabpanel" className="p-3">
+                  <p className="text-sm text-muted">
+                    Couleur du {modele.zonesCouleur.find((z) => z.cle === zoneActive)?.libelle.toLowerCase()} :
+                  </p>
+                  <ul className="mt-2 flex flex-wrap gap-3">
+                    {couleurs.map((c) => (
+                      <li key={c.id}>
+                        <Pastille
+                          hex={c.hex}
+                          nom={c.nom}
+                          choisie={c.id === (config.couleursZones?.[zoneActive] ?? config.couleurId)}
+                          onClick={() => modifier({ couleursZones: { ...config.couleursZones, [zoneActive]: c.id } })}
                         />
-                      ))}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="p-3 text-sm text-muted">Choisissez une zone ci-dessus, ou cliquez directement sur le vêtement dans l&apos;aperçu.</p>
+              )}
+            </div>
           ) : (
-            <p className="mt-1 text-sm text-muted">Par défaut, tout le vêtement est dans la couleur choisie ci-dessus.</p>
+            <p className="mt-1 text-sm text-muted">
+              Par défaut, tout le vêtement est dans la couleur choisie ci-dessus. Astuce : cliquez sur une zone du vêtement dans l&apos;aperçu
+              pour changer sa couleur.
+            </p>
           )}
         </div>
       ) : null}

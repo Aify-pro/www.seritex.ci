@@ -91,8 +91,15 @@ export const Apercu = forwardRef<
     mockup?: MockupCatalogue | null;
     /** Couleur (hex) de chaque zone du mockup. */
     couleursZones?: Record<string, string>;
+    /** Zone surlignée (palette ouverte). */
+    zoneActive?: string | null;
+    /** Clic sur une zone du mockup : ouvre sa palette. */
+    onChoisirZone?: (cle: string) => void;
   }
->(function Apercu({ vue, couleurHex, forme, marquages, onModifier, onSelectionner, cadrage, cotes = false, mockup = null, couleursZones = {} }, ref) {
+>(function Apercu(
+  { vue, couleurHex, forme, marquages, onModifier, onSelectionner, cadrage, cotes = false, mockup = null, couleursZones = {}, zoneActive = null, onChoisirZone },
+  ref,
+) {
   const vb = viewBoxDe(mockup);
   // Échelle des traits, poignées et textes : constants à l'écran, quel que soit le dessin ou le gros plan.
   const k = (cadrage ? cadrage[2] : vb[2]) / 400;
@@ -197,6 +204,18 @@ export const Apercu = forwardRef<
           .filter(([, zk]) => zk !== "__contour" && couleursZones[zk])
           .map(([id, zk]) => `[id="${pm}-${echap(id)}"], [id="${pm}-${echap(id)}"] * { fill: ${couleursZones[zk]} !important; }`),
         `[id="${gid}-masque"] * { fill: #fff !important; stroke: #fff !important; }`,
+        // Zones cliquables, et zone dont la palette est ouverte surlignée.
+        ...(onChoisirZone
+          ? Object.entries(mockup.zones)
+              .filter(([, zk]) => zk !== "__contour")
+              .map(([id]) => `[id="${pm}-${echap(id)}"] { cursor: pointer; }`)
+          : []),
+        ...Object.entries(mockup.zones)
+          .filter(([, zk]) => zoneActive && zk === zoneActive)
+          .map(
+            ([id]) =>
+              `[id="${pm}-${echap(id)}"], [id="${pm}-${echap(id)}"] * { stroke: #f28c1b !important; stroke-width: ${(4 * k).toFixed(2)}px !important; stroke-dasharray: ${(8 * k).toFixed(2)} ${(5 * k).toFixed(2)}; }`,
+          ),
         ...nommes
           .filter((id) => !relies.includes(id) && !/^(defs|style)/i.test(id))
           .map((id) => `[id="${pk}-${echap(id)}"] { display: none !important; }`),
@@ -225,7 +244,23 @@ export const Apercu = forwardRef<
               <g id={`${gid}-masque`} dangerouslySetInnerHTML={{ __html: caler(scoperSvg(mockup.svg, pk)) }} />
             </mask>
           </defs>
-          <g dangerouslySetInnerHTML={{ __html: caler(scoperSvg(mockup.svg, pm)) }} />
+          <g
+            dangerouslySetInnerHTML={{ __html: caler(scoperSvg(mockup.svg, pm)) }}
+            onClick={
+              onChoisirZone
+                ? (e) => {
+                    // Remonte du point cliqué jusqu'au calque relié à une zone de couleur.
+                    for (let el = e.target as Element | null; el && el !== e.currentTarget; el = el.parentElement) {
+                      const zk = el.id.startsWith(`${pm}-`) ? mockup.zones[el.id.slice(pm.length + 1)] : undefined;
+                      if (zk && zk !== "__contour") {
+                        onChoisirZone(zk);
+                        return;
+                      }
+                    }
+                  }
+                : undefined
+            }
+          />
         </>
       ) : (
         <>
