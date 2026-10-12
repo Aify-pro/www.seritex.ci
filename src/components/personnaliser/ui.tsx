@@ -37,14 +37,14 @@ export function Puce({
 /** Pastille de couleur avec son nom (même principe que la plateforme). */
 export function Pastille({ hex, nom, choisie, onClick }: { hex: string | null; nom: string; choisie: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={choisie} className="flex w-20 flex-col items-center gap-1 text-center">
+    <button type="button" onClick={onClick} aria-pressed={choisie} className="flex w-14 flex-col items-center gap-1 text-center sm:w-20">
       <span
-        className={`relative grid size-11 place-items-center rounded-full border-2 ${choisie ? "border-orange ring-2 ring-ink" : "border-ink"}`}
+        className={`relative grid size-8 place-items-center sm:size-11 rounded-full border-2 ${choisie ? "border-orange ring-2 ring-ink" : "border-ink"}`}
         style={{ background: hex ?? "#ccc" }}
       >
-        {choisie ? <Check aria-hidden size={18} className="text-white mix-blend-difference" /> : null}
+        {choisie ? <Check aria-hidden size={16} className="text-white mix-blend-difference" /> : null}
       </span>
-      <span className="text-xs leading-tight">{nom}</span>
+      <span className="text-[11px] leading-tight sm:text-xs">{nom}</span>
     </button>
   );
 }

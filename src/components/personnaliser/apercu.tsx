@@ -230,7 +230,8 @@ export const Apercu = forwardRef<
       role="img"
       aria-label={`Aperçu ${vue === "face" ? "de face" : "de dos"}`}
       className="h-auto w-full select-none"
-      style={interactif ? { touchAction: "none" } : undefined}
+      // « manipulation » : pas de zoom du navigateur au double appui sur une zone (mobile).
+      style={interactif ? { touchAction: "none" } : onChoisirZone ? { touchAction: "manipulation" } : undefined}
       onPointerMove={interactif ? bouger : undefined}
       onPointerUp={interactif ? finir : undefined}
       onPointerCancel={interactif ? finir : undefined}

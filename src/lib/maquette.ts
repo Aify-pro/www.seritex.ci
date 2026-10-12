@@ -346,16 +346,40 @@ export async function pdfMaquette(c: ContenuMaquette): Promise<Blob> {
       ya += 15;
     }
 
+    // Encadré « Votre choix » : la technique retenue par le client, appliquée à son logo.
+    const meme = r.choix.id === r.conseil.id;
     police(texte, 10);
-    const lignesConseil = doc.splitTextToSize(propre(r.conseil.pourquoi), la - 8) as string[];
-    const hConseil = 12 + lignesConseil.length * 4.3;
-    place(hConseil + 4);
-    carte(xa, ya, la, hConseil, C.orangePale);
+    const corpsChoix = [r.choix.realisation, ...(meme ? [r.conseil.pourquoi] : r.choix.atouts.map((t) => `• ${t}`))];
+    const lignesChoix = corpsChoix.flatMap((t) => doc.splitTextToSize(propre(t), la - 8) as string[]);
+    const lignesLimites = r.choix.limites.flatMap((t) => doc.splitTextToSize(propre(`• ${t}`), la - 8) as string[]);
+    const hChoix = 12 + lignesChoix.length * 4.3 + (lignesLimites.length ? 6 + lignesLimites.length * 4.3 : 0);
+    place(hChoix + 4);
+    carte(xa, ya, la, hChoix, meme ? C.orangePale : C.ecru);
     police(titre, 12, C.ink);
-    doc.text(propre(`Notre conseil : ${r.conseil.label}`), xa + 4, ya + 7);
+    doc.text(propre(`Votre choix : ${r.choix.label}${meme ? " — aussi notre conseil" : ""}`), xa + 4, ya + 7);
     police(texte, 10);
-    doc.text(lignesConseil, xa + 4, ya + 12.5);
-    ya += hConseil + 7;
+    doc.text(lignesChoix, xa + 4, ya + 12.5);
+    if (lignesLimites.length) {
+      const yl = ya + 12.5 + lignesChoix.length * 4.3 + 1.5;
+      police(titre, 10, C.rouge);
+      doc.text("Ses limites avec ce logo", xa + 4, yl);
+      police(texte, 10, C.ink);
+      doc.text(lignesLimites, xa + 4, yl + 5);
+    }
+    ya += hChoix + 7;
+
+    if (!meme) {
+      police(texte, 10);
+      const lignesConseil = doc.splitTextToSize(propre(r.conseil.pourquoi), la - 8) as string[];
+      const hConseil = 12 + lignesConseil.length * 4.3;
+      place(hConseil + 4);
+      carte(xa, ya, la, hConseil, C.orangePale);
+      police(titre, 12, C.ink);
+      doc.text(propre(`Notre conseil : ${r.conseil.label}`), xa + 4, ya + 7);
+      police(texte, 10);
+      doc.text(lignesConseil, xa + 4, ya + 12.5);
+      ya += hConseil + 7;
+    }
 
     if (r.remarqueChoix) {
       place(12);
