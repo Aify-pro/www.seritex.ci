@@ -1,5 +1,6 @@
 "use client";
 
+import type { RefObject } from "react";
 import { couleursProposees, grammagesProposes, MENTION_INDISPONIBLE, type ModeleCatalogue } from "@/lib/catalogue-plateforme";
 import type { Configuration } from "./etat";
 import { quantiteTotale } from "./etat";
@@ -12,6 +13,8 @@ export function EtapeArticle({
   modifier,
   zoneActive,
   choisirZone,
+  paletteRef,
+  apresCouleur,
 }: {
   modele: ModeleCatalogue;
   config: Configuration;
@@ -19,11 +22,22 @@ export function EtapeArticle({
   /** Zone dont la palette est ouverte (onglet actif) ; partagée avec l'aperçu (clic sur une zone du dessin). */
   zoneActive: string | null;
   choisirZone: (cle: string | null) => void;
+  /** Palette de la zone ouverte : cible du double appui sur l'aperçu (mobile). */
+  paletteRef: RefObject<HTMLDivElement | null>;
+  /** Appelé après le choix d'une couleur (mobile : retour à l'aperçu). */
+  apresCouleur: () => void;
 }) {
   const couleurs = couleursProposees(modele);
   const indisponibles = modele.couleurs.filter((c) => c.statut === "indisponible");
   const grammages = config.couleurId ? grammagesProposes(modele, config.couleurId) : modele.grammages;
   const total = quantiteTotale(config);
+  const parZone = modele.zonesCouleur.length > 1 && couleurs.length > 0;
+
+  /** Couleur principale : garde la qualité de tissu si elle existe dans cette couleur. */
+  const couleurPrincipale = (id: string) => {
+    const g = grammagesProposes(modele, id);
+    return { couleurId: id, grammageId: g.some((x) => x.id === config.grammageId) ? config.grammageId : (g[0]?.id ?? null) };
+  };
 
   return (
     <div className="space-y-8">
@@ -31,8 +45,9 @@ export function EtapeArticle({
         <Titre>Couleur du textile</Titre>
         {couleurs.length === 0 ? (
           <p className="mt-2 text-rouge">{MENTION_INDISPONIBLE}</p>
-        ) : (
-          <ul className="mt-3 flex flex-wrap gap-3">
+        ) : config.couleursZones ? null : (
+          // Couleur unie : masquée dès que le client choisit ses couleurs zone par zone.
+          <ul className="mt-3 flex flex-wrap gap-2 sm:gap-3">
             {couleurs.map((c) => (
               <li key={c.id}>
                 <Pastille
@@ -40,11 +55,8 @@ export function EtapeArticle({
                   nom={c.nom}
                   choisie={c.id === config.couleurId}
                   onClick={() => {
-                    const g = grammagesProposes(modele, c.id);
-                    modifier({
-                      couleurId: c.id,
-                      grammageId: g.some((x) => x.id === config.grammageId) ? config.grammageId : (g[0]?.id ?? null),
-                    });
+                    modifier(couleurPrincipale(c.id));
+                    apresCouleur();
                   }}
                 />
               </li>
@@ -58,8 +70,8 @@ export function EtapeArticle({
         ) : null}
       </div>
 
-      {modele.zonesCouleur.length > 1 && couleurs.length > 0 ? (
-        <div>
+      {parZone ? (
+        <div className="-mt-4">
           <label className="flex min-h-11 items-center gap-3 font-display font-semibold">
             <input
               type="checkbox"
@@ -99,18 +111,23 @@ export function EtapeArticle({
                 })}
               </div>
               {zoneActive && modele.zonesCouleur.some((z) => z.cle === zoneActive) ? (
-                <div role="tabpanel" className="p-3">
+                <div ref={paletteRef} role="tabpanel" className="scroll-mt-24 p-3">
                   <p className="text-sm text-muted">
                     Couleur du {modele.zonesCouleur.find((z) => z.cle === zoneActive)?.libelle.toLowerCase()} :
                   </p>
-                  <ul className="mt-2 flex flex-wrap gap-3">
+                  <ul className="mt-2 flex flex-wrap gap-2 sm:gap-3">
                     {couleurs.map((c) => (
                       <li key={c.id}>
                         <Pastille
                           hex={c.hex}
                           nom={c.nom}
                           choisie={c.id === (config.couleursZones?.[zoneActive] ?? config.couleurId)}
-                          onClick={() => modifier({ couleursZones: { ...config.couleursZones, [zoneActive]: c.id } })}
+                          onClick={() => {
+                            // La première zone (le corps) donne la couleur principale de la demande.
+                            const principale = zoneActive === modele.zonesCouleur[0].cle ? couleurPrincipale(c.id) : {};
+                            modifier({ couleursZones: { ...config.couleursZones, [zoneActive]: c.id }, ...principale });
+                            apresCouleur();
+                          }}
                         />
                       </li>
                     ))}

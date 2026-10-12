@@ -12,6 +12,8 @@ import { EtapeEnvoi } from "./etape-envoi";
 import { EtapeMarquage } from "./etape-marquage";
 
 const ETAPES = ["Couleur & quantité", "Logo & emplacement", "Ma maquette"] as const;
+/** Libellés courts de la barre d'étapes sur mobile. */
+const ETAPES_COURTES = ["Couleur", "Logo", "Maquette"] as const;
 
 /** Parcours de personnalisation d'un article de l'e-shop (fiche article). */
 export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
@@ -22,6 +24,10 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
   const haut = useRef<HTMLDivElement>(null);
   // Zone de couleur dont la palette est ouverte (onglet), partagée avec l'aperçu.
   const [zoneActive, setZoneActive] = useState<string | null>(null);
+  const apercuRef = useRef<HTMLDivElement>(null);
+  const paletteRef = useRef<HTMLDivElement>(null);
+  // Double appui sur une zone de l'aperçu : dernière zone touchée et quand.
+  const dernierAppui = useRef<{ cle: string; t: number } | null>(null);
 
   function allerA(i: number) {
     setEtape(i);
@@ -47,8 +53,25 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
     setZoneActive(cle);
     if (!cle) return;
     if (!config.couleursZones) modifier({ couleursZones: Object.fromEntries(modele.zonesCouleur.map((z) => [z.cle, config.couleurId])) });
+    // La vue affichée reste si la zone y figure (col, manches… souvent dessinés devant ET derrière).
+    const sur = (v: Vue) => Object.values(mockupPour(modele, v)?.zones ?? {}).includes(cle);
+    if (sur(vue)) return;
     const mk = modele.mockups.find((m) => Object.values(m.zones).includes(cle));
     if (mk) setVue(mk.vue === "avant" ? "face" : "dos");
+  }
+
+  /** Mobile seulement (aperçu au-dessus des options) : fait défiler la page sans gêner l'écran large. */
+  const defiler = (cible: HTMLElement | null, block: ScrollLogicalPosition) => {
+    if (cible && window.matchMedia("(max-width: 1023px)").matches) cible.scrollIntoView({ behavior: "smooth", block });
+  };
+
+  /** Clic sur le dessin : ouvre la zone ; double appui (ou double clic) : descend jusqu'à sa palette. */
+  function toucherZone(cle: string) {
+    const maintenant = Date.now();
+    const double = dernierAppui.current?.cle === cle && maintenant - dernierAppui.current.t < 400;
+    dernierAppui.current = double ? null : { cle, t: maintenant };
+    choisirZone(cle);
+    if (double) requestAnimationFrame(() => defiler(paletteRef.current, "center"));
   }
 
   function setMarquages(marquages: Marquage[]) {
@@ -86,10 +109,23 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
     ];
   });
 
+  // Photos du modèle : sous l'aperçu sur écran large, après les options sur mobile.
+  const galerie =
+    photos.length > 0 ? (
+      <div>
+        <p className="mt-2 font-mono text-xs tracking-wider uppercase">Photos du modèle</p>
+        <div className="mt-2 grid grid-cols-4 gap-2">
+          {photos.slice(0, 8).map((p) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={p.url} src={p.url} alt="" className="aspect-square w-full border border-ink object-cover" />
+          ))}
+        </div>
+      </div>
+    ) : null;
 
   return (
     <div ref={haut} className="scroll-mt-24">
-      <ol className="flex flex-wrap gap-2" aria-label="Étapes">
+      <ol className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2" aria-label="Étapes">
         {ETAPES.map((nom, i) => (
           <li key={nom}>
             <button
@@ -97,21 +133,31 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
               onClick={() => allerA(i)}
               disabled={i > 0 && quantiteManquante}
               aria-current={i === etape ? "step" : undefined}
-              className={`inline-flex min-h-11 items-center gap-2 border-2 border-ink px-4 font-display text-sm font-bold ${
+              className={`inline-flex min-h-11 w-full items-center gap-1.5 border-2 border-ink px-2 text-left font-display text-xs leading-tight font-bold sm:w-auto sm:gap-2 sm:px-4 sm:text-sm ${
                 i === etape ? "bg-indigo text-white shadow-hard-sm" : "bg-paper"
               } disabled:cursor-not-allowed disabled:opacity-50`}
             >
-              <span className={`grid size-6 place-items-center rounded-full text-xs ${i === etape ? "bg-orange text-ink" : "bg-ecru-dark"}`}>{i + 1}</span>
-              {nom}
+              <span className={`grid size-6 shrink-0 place-items-center rounded-full text-xs ${i === etape ? "bg-orange text-ink" : "bg-ecru-dark"}`}>{i + 1}</span>
+              <span className="sm:hidden">{ETAPES_COURTES[i]}</span>
+              <span className="hidden sm:inline">{nom}</span>
             </button>
           </li>
         ))}
       </ol>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-12">
-        <div className="border-2 border-ink bg-paper p-5 shadow-hard sm:p-8 lg:col-span-7">
+      <div className="mt-6 grid gap-6 lg:mt-8 lg:grid-cols-12 lg:gap-8">
+        <div className="order-2 border-2 border-ink bg-paper p-4 shadow-hard sm:p-8 lg:order-1 lg:col-span-7">
           {etape === 0 ? (
-            <EtapeArticle modele={modele} config={config} modifier={modifier} zoneActive={zoneActive} choisirZone={choisirZone} />
+            <EtapeArticle
+              modele={modele}
+              config={config}
+              modifier={modifier}
+              zoneActive={zoneActive}
+              choisirZone={choisirZone}
+              paletteRef={paletteRef}
+              // Mobile : une couleur choisie, on remonte voir le résultat sur l'aperçu.
+              apresCouleur={() => defiler(apercuRef.current, "start")}
+            />
           ) : etape === 1 ? (
             <EtapeMarquage modele={modele} marquages={config.marquages} actifId={actifId} setActif={setActif} setMarquages={setMarquages} />
           ) : (
@@ -152,9 +198,10 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
           </div>
         </div>
 
-        <aside className="lg:col-span-5">
-          <div className="sticky top-24 space-y-3">
-            <div className="relative border-2 border-ink bg-[radial-gradient(circle_at_50%_35%,#fffdf8,#ebe3d1)] p-4">
+        {/* Mobile : l'aperçu en tête, les options dessous. */}
+        <aside ref={apercuRef} className="order-1 scroll-mt-20 lg:order-2 lg:col-span-5">
+          <div className="space-y-3 lg:sticky lg:top-24">
+            <div className="relative mx-auto max-w-[19rem] border-2 border-ink lg:max-w-none bg-[radial-gradient(circle_at_50%_35%,#fffdf8,#ebe3d1)] p-4">
               <span className="absolute top-3 left-3 bg-ink px-2 py-1 font-mono text-xs tracking-wider text-ecru uppercase">{vue}</span>
               <Apercu
                 vue={vue}
@@ -163,7 +210,7 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
                 couleursZones={couleursZonesHex}
                 // Étape 1 : un clic sur une zone du vêtement ouvre sa palette.
                 zoneActive={etape === 0 && config.couleursZones ? zoneActive : null}
-                onChoisirZone={etape === 0 && modele.zonesCouleur.length > 1 ? choisirZone : undefined}
+                onChoisirZone={etape === 0 && modele.zonesCouleur.length > 1 ? toucherZone : undefined}
                 forme={formePour(modele.nom, modele.sousFamille)}
                 marquages={apercus}
                 // Étape « Logo & emplacement » : le logo se déplace, se redimensionne et s'incline directement ici.
@@ -176,16 +223,16 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
                 onSelectionner={etape === 1 ? setActif : undefined}
               />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="mx-auto grid max-w-[19rem] grid-cols-2 gap-2 lg:max-w-none">
               {(["face", "dos"] as const).map((v) => (
                 <button
                   key={v}
                   type="button"
                   aria-pressed={vue === v}
                   onClick={() => setVue(v)}
-                  className={`flex min-h-12 items-center gap-2 border-2 border-ink px-3 font-display text-sm font-bold capitalize ${vue === v ? "bg-indigo text-white" : "bg-paper"}`}
+                  className={`flex min-h-11 items-center gap-2 border-2 border-ink px-3 font-display text-sm font-bold capitalize ${vue === v ? "bg-indigo text-white" : "bg-paper"}`}
                 >
-                  <span className="w-8">
+                  <span className="w-6 lg:w-8">
                     <Apercu
                       vue={v}
                       couleurHex={couleurHex}
@@ -214,20 +261,14 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
                 le rond du haut pour l&apos;incliner (Maj : par 15°).
               </p>
             ) : null}
-            <p className="text-xs text-muted">Aperçu indicatif, à l&apos;échelle d&apos;un adulte taille M. Le rendu final est validé sur BAT.</p>
-            {photos.length > 0 ? (
-              <div>
-                <p className="mt-2 font-mono text-xs tracking-wider uppercase">Photos du modèle</p>
-                <div className="mt-2 grid grid-cols-4 gap-2">
-                  {photos.slice(0, 8).map((p) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={p.url} src={p.url} alt="" className="aspect-square w-full border border-ink object-cover" />
-                  ))}
-                </div>
-              </div>
+            {etape === 0 && modele.zonesCouleur.length > 1 ? (
+              <p className="text-xs text-muted lg:hidden">Touchez une zone du vêtement pour la choisir, touchez-la deux fois pour aller à sa palette.</p>
             ) : null}
+            <p className="text-xs text-muted">Aperçu indicatif, à l&apos;échelle d&apos;un adulte taille M. Le rendu final est validé sur BAT.</p>
+            <div className="hidden lg:block">{galerie}</div>
           </div>
         </aside>
+        {galerie ? <div className="order-3 lg:hidden">{galerie}</div> : null}
       </div>
     </div>
   );

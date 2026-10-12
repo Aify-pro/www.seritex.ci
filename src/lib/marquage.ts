@@ -377,6 +377,11 @@ export type Rapport = {
   /** Dégradé : `couleurs` sont alors les teintes principales, pas des aplats. */
   degrade: boolean;
   conseil: { id: TechniqueId; label: string; pourquoi: string };
+  /**
+   * La technique choisie par le client, telle qu'elle s'appliquera à ce logo :
+   * comment il sera réalisé, ses atouts et ses limites ici.
+   */
+  choix: { id: TechniqueId; label: string; realisation: string; atouts: string[]; limites: string[] };
   /** Pourquoi pas les autres techniques, une phrase chacune. */
   alternatives: { id: TechniqueId; label: string; avis: string }[];
   /** Si le client a choisi une autre technique que celle conseillée. */
@@ -405,6 +410,7 @@ export function rapportMarquage(a: AnalyseLogo, c: ContexteRapport): Rapport {
       couleurs: [],
       degrade: false,
       conseil: { id: t.id, label: t.label, pourquoi: `Nous partons sur la technique que vous avez choisie, ${techniqueAvecArticle(t.id)} ; votre conseiller vous confirmera qu'elle convient après examen du fichier.` },
+      choix: { id: t.id, label: t.label, realisation: t.resume, atouts: [], limites: [] },
       alternatives: [],
       remarqueChoix: null,
       aVerifier: [],
@@ -482,9 +488,33 @@ export function rapportMarquage(a: AnalyseLogo, c: ContexteRapport): Rapport {
     return { id: e.id, label: t.label, avis };
   });
 
+  // Ce que donnera la technique choisie sur ce logo précis.
+  const fils = Math.min(n, 12);
+  const realisation: Record<TechniqueId, string> = {
+    serigraphie: a.degrade
+      ? `En sérigraphie, les dégradés de votre logo seront reproduits par une trame de petits points${textileFonce ? ", sur une sous-couche blanche pour ressortir sur le textile foncé" : ""}.`
+      : `En sérigraphie, chaque couleur est imprimée avec son propre écran : votre logo demandera ${n} écran${n > 1 ? "s" : ""}${textileFonce ? ", plus une sous-couche blanche pour ressortir sur le textile foncé" : ""}.`,
+    broderie: a.degrade
+      ? `En broderie, votre logo sera redessiné point par point et simplifié en quelques couleurs de fil (au plus 12) : les dégradés ne se brodent pas tels quels.`
+      : `En broderie, votre logo sera redessiné point par point et brodé en ${fils} couleur${fils > 1 ? "s" : ""} de fil, en relief${n > 12 ? ` (ses ${n} couleurs seront regroupées)` : ""}.`,
+    "flex-quadriflex":
+      n <= 1 && !a.degrade
+        ? "En Flex, votre logo sera découpé dans un vinyle de la couleur choisie puis thermocollé : contours nets, couleur vive."
+        : "Avec plusieurs couleurs, votre logo passera en QuadriFlex : imprimé sur un film, découpé à la forme puis thermocollé.",
+    "impression-numerique": `En impression numérique, votre logo sera imprimé directement en couleurs, sans écran${textileFonce ? ", sur une sous-couche blanche déposée sur le textile foncé" : ""}.`,
+  };
+  const choisie = ev[c.technique];
+  const choix = {
+    id: c.technique,
+    label: getTechnique(c.technique).label,
+    realisation: realisation[c.technique],
+    atouts: choisie.pour.map((p) => `${p.charAt(0).toUpperCase()}${p.slice(1)}.`),
+    limites: choisie.contre.map((p) => `${p.charAt(0).toUpperCase()}${p.slice(1)}.`),
+  };
+
   const remarqueChoix =
     c.technique !== best.id
-      ? `Vous avez choisi ${techniqueAvecArticle(c.technique)}. C'est possible ; nous vous recommandons toutefois ${techniqueAvecArticle(best.id)} pour les raisons ci-dessus. Votre conseiller en discutera avec vous.`
+      ? `Votre choix, ${techniqueAvecArticle(c.technique)}, reste possible ; nous vous recommandons toutefois ${techniqueAvecArticle(best.id)} pour les raisons ci-dessus. Votre conseiller en discutera avec vous.`
       : null;
 
   const aVerifier: string[] = [];
@@ -518,7 +548,9 @@ export function rapportMarquage(a: AnalyseLogo, c: ContexteRapport): Rapport {
     couleurs: a.degrade ? a.couleurs.slice(0, 5) : a.couleurs,
     degrade: a.degrade,
     conseil: { id: best.id, label, pourquoi },
-    alternatives,
+    choix,
+    // La technique choisie a son propre paragraphe : pas de doublon dans « les autres techniques ».
+    alternatives: alternatives.filter((x) => x.id !== c.technique),
     remarqueChoix,
     aVerifier,
   };

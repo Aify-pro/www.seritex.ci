@@ -67,6 +67,15 @@ export const catalogueExemple: ModeleCatalogue[] = [
         cadre: { x: 20, y: 68, w: 560, h: 532 },
         reperes: { "z-poitrine": { x: 300, y: 250 }, "z-coeur": { x: 362, y: 185 } },
       },
+      {
+        // Même dessin vu de dos : le col et les manches figurent sur les deux vues.
+        vue: "dos",
+        svg: MOCKUP_AVANT,
+        zones: { corps_avant: "corps_arriere", col: "col", manche_gauche: "manche_gauche", manche_droite: "manche_droite" },
+        largeurCm: 56,
+        cadre: { x: 20, y: 68, w: 560, h: 532 },
+        reperes: {},
+      },
     ],
   },
   {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { AlertTriangle, CheckCircle2, Download, FileImage, Lightbulb, Loader2, Send } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Download, FileImage, Lightbulb, Loader2, Send } from "lucide-react";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
 import { validerCoordonnees, type Coordonnees, type ErreursCoordonnees, type FichierDepose, type MarquageEnvoye } from "@/lib/envoi-personnalisation";
 import { imageMaquette, pdfMaquette, telecharger, type ContenuMaquette } from "@/lib/maquette";
@@ -386,24 +386,55 @@ export function EtapeEnvoi({
                       </p>
                     </div>
                   ) : null}
-                  <div className="border-2 border-ink bg-orange/15 p-4">
-                    <p className="flex items-center gap-2 font-display text-lg font-black">
-                      <Lightbulb aria-hidden size={20} className="text-orange" /> Notre conseil : {rapport.conseil.label}
+                  {/* La technique choisie par le client, appliquée à son logo. */}
+                  <div className={`border-2 border-ink p-4 ${rapport.choix.id === rapport.conseil.id ? "bg-orange/15" : "bg-ecru"}`}>
+                    <p className="flex flex-wrap items-center gap-2 font-display text-lg font-black">
+                      <Check aria-hidden size={20} className="text-indigo" /> Votre choix : {rapport.choix.label}
+                      {rapport.choix.id === rapport.conseil.id ? (
+                        <span className="bg-orange px-2 py-0.5 font-mono text-[10px] tracking-wider text-ink uppercase">aussi notre conseil</span>
+                      ) : null}
                     </p>
-                    <p className="mt-1">{rapport.conseil.pourquoi}</p>
-                    {rapport.remarqueChoix ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-3 border-t-2 border-dashed border-ink pt-3">
-                        <p className="flex-1 text-indigo">{rapport.remarqueChoix}</p>
-                        <button
-                          type="button"
-                          onClick={() => setMarquages(config.marquages.map((x) => (x.id === m.id ? { ...x, technique: rapport.conseil.id } : x)))}
-                          className="min-h-11 border-2 border-ink bg-paper px-4 font-display text-sm font-bold"
-                        >
-                          Retenir {techniqueAvecArticle(rapport.conseil.id)}
-                        </button>
+                    <p className="mt-1">{rapport.choix.realisation}</p>
+                    {rapport.choix.id === rapport.conseil.id ? (
+                      <p className="mt-2">{rapport.conseil.pourquoi}</p>
+                    ) : rapport.choix.atouts.length ? (
+                      <ul className="mt-2 list-disc space-y-0.5 pl-5">
+                        {rapport.choix.atouts.map((t) => (
+                          <li key={t}>{t}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {rapport.choix.limites.length ? (
+                      <div className="mt-2">
+                        <p className="font-display font-bold text-rouge">Ses limites avec ce logo</p>
+                        <ul className="mt-0.5 list-disc space-y-0.5 pl-5">
+                          {rapport.choix.limites.map((t) => (
+                            <li key={t}>{t}</li>
+                          ))}
+                        </ul>
                       </div>
                     ) : null}
                   </div>
+                  {rapport.choix.id !== rapport.conseil.id ? (
+                    <div className="border-2 border-ink bg-orange/15 p-4">
+                      <p className="flex items-center gap-2 font-display text-lg font-black">
+                        <Lightbulb aria-hidden size={20} className="text-orange" /> Notre conseil : {rapport.conseil.label}
+                      </p>
+                      <p className="mt-1">{rapport.conseil.pourquoi}</p>
+                      {rapport.remarqueChoix ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-3 border-t-2 border-dashed border-ink pt-3">
+                          <p className="flex-1 text-indigo">{rapport.remarqueChoix}</p>
+                          <button
+                            type="button"
+                            onClick={() => setMarquages(config.marquages.map((x) => (x.id === m.id ? { ...x, technique: rapport.conseil.id } : x)))}
+                            className="min-h-11 border-2 border-ink bg-paper px-4 font-display text-sm font-bold"
+                          >
+                            Retenir {techniqueAvecArticle(rapport.conseil.id)}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {rapport.alternatives.length ? (
                     <div>
                       <p className="font-display font-bold">Et les autres techniques ?</p>
