@@ -36,10 +36,11 @@ export async function POST(request: Request) {
         ...envoi.coordonnees,
         modele_id: envoi.modele_id,
         couleur_id: envoi.couleur_id,
-        couleurs_zones: envoi.couleurs_zones,
         textile_id: envoi.textile_id,
         quantite: String(envoi.quantite),
-        repartition: envoi.repartition,
+        // Facultatifs : omis plutôt qu'envoyés à null (la base lit ces champs comme des objets JSON).
+        ...(envoi.couleurs_zones ? { couleurs_zones: envoi.couleurs_zones } : {}),
+        ...(envoi.repartition ? { repartition: envoi.repartition } : {}),
         marquages: envoi.marquages,
         fichiers: envoi.fichiers,
       },
