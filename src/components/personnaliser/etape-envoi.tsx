@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { AlertTriangle, Check, CheckCircle2, Download, FileImage, Lightbulb, Loader2, Send } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Download, FileImage, Lightbulb, Loader2, LogOut, Send } from "lucide-react";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
 import { validerCoordonnees, type Coordonnees, type ErreursCoordonnees, type FichierDepose, type MarquageEnvoye } from "@/lib/envoi-personnalisation";
 import { imageMaquette, pdfMaquette, telecharger, type ContenuMaquette } from "@/lib/maquette";
@@ -12,6 +12,9 @@ import { Apercu, cadragePour, formePour, type MarquageApercu } from "./apercu";
 import type { Configuration, Marquage } from "./etat";
 import { libelleEmplacement } from "./etape-marquage";
 import { Titre } from "./ui";
+import { Identification } from "@/components/compte/identification";
+import { useCompte } from "@/components/compte/use-compte";
+import { effacerBrouillon } from "./brouillon";
 
 type Etat =
   | { kind: "saisie" }
@@ -52,6 +55,13 @@ export function EtapeEnvoi({
   const [erreurs, setErreurs] = useState<ErreursCoordonnees>({});
   const [coord, setCoord] = useState<Coordonnees>({ nom: "", entreprise: "", email: "", telephone: "", date_souhaitee: "", message: "" });
   const [prepa, setPrepa] = useState<"pdf" | "image" | null>(null);
+  const compte = useCompte();
+  const profil = compte.profil;
+
+  // Personne identifiée : ses coordonnées pré-remplissent le formulaire (l'e-mail est celui du compte).
+  const coordonnees: Coordonnees = profil
+    ? { ...coord, nom: coord.nom || profil.nom, entreprise: coord.entreprise || profil.entreprise, email: profil.email, telephone: coord.telephone || profil.telephone }
+    : coord;
 
   const forme = formePour(modele.nom, modele.sousFamille);
   const sansCadre = apercus.map((a) => ({ ...a, actif: false }));
@@ -117,7 +127,7 @@ export function EtapeEnvoi({
     return {
       vues,
       reference,
-      client: coord.nom ? [coord.nom, coord.entreprise].filter(Boolean).join(" — ") : undefined,
+      client: coordonnees.nom ? [coordonnees.nom, coordonnees.entreprise].filter(Boolean).join(" — ") : undefined,
       couleurTextile: { nom: couleur, hex: couleurHex },
       article: [
         { libelle: "Article", valeur: modele.nom },
@@ -171,7 +181,7 @@ export function EtapeEnvoi({
   async function envoyer(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const piege = new FormData(e.currentTarget).get("site_web");
-    const errs = validerCoordonnees(coord);
+    const errs = validerCoordonnees(coordonnees);
     setErreurs(errs);
     if (Object.keys(errs).length) {
       e.currentTarget.querySelector<HTMLElement>(`[name="${Object.keys(errs)[0]}"]`)?.focus();
@@ -198,6 +208,10 @@ export function EtapeEnvoi({
       });
       const p = await prep.json();
       if (p.ferme) return setEtat({ kind: "ferme", message: p.message });
+      if (p.identification) {
+        void compte.actualiser();
+        return setEtat({ kind: "erreur", message: p.message });
+      }
       if (!prep.ok || !p.ok) return setEtat({ kind: "erreur", message: p.message ?? "Envoi impossible pour le moment." });
 
       const deposes: FichierDepose[] = [];
@@ -228,7 +242,7 @@ export function EtapeEnvoi({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           envoi_id: p.envoiId,
-          coordonnees: coord,
+          coordonnees,
           modele_id: modele.id,
           couleur_id: config.couleurId || null,
           couleurs_zones: config.couleursZones,
@@ -243,7 +257,12 @@ export function EtapeEnvoi({
       });
       const r = await res.json();
       if (r.ferme) return setEtat({ kind: "ferme", message: r.message });
+      if (r.identification) {
+        void compte.actualiser();
+        return setEtat({ kind: "erreur", message: r.message });
+      }
       if (!res.ok || !r.ok) return setEtat({ kind: "erreur", message: r.message ?? "Envoi impossible pour le moment." });
+      void effacerBrouillon(modele.id);
       setEtat({ kind: "envoye", reference: r.reference ?? null });
     } catch {
       setEtat({ kind: "erreur", message: "Connexion impossible. Vérifiez votre réseau et réessayez : votre composition est conservée." });
@@ -262,7 +281,7 @@ export function EtapeEnvoi({
       <input
         id={`c-${k}`}
         name={k}
-        value={coord[k]}
+        value={coordonnees[k]}
         onChange={(e) => setCoord({ ...coord, [k]: e.target.value })}
         className={inputCls}
         {...aria(k)}
@@ -493,13 +512,39 @@ export function EtapeEnvoi({
             Demander un devis
           </Link>
         </div>
+      ) : !compte.charge ? (
+        <p className="border-t-2 border-dashed border-ink pt-6 text-muted" role="status">
+          <Loader2 aria-hidden className="mr-2 inline animate-spin" size={16} /> Vérification de votre identification…
+        </p>
+      ) : !profil ? (
+        compte.disponible ? (
+          <Identification retour={typeof window === "undefined" ? "/e-shop" : window.location.pathname} onConnecte={compte.connecte} />
+        ) : (
+          <div role="alert" className="border-2 border-ink bg-orange/15 p-5">
+            <p className="font-display text-lg font-bold">L&apos;envoi en ligne est momentanément indisponible.</p>
+            <p className="mt-2 text-sm text-muted">Téléchargez votre maquette et joignez-la à votre demande de devis.</p>
+            <Link href="/devis" className="mt-4 inline-flex min-h-12 items-center border-2 border-ink bg-orange px-5 font-display font-bold">
+              Demander un devis
+            </Link>
+          </div>
+        )
       ) : (
         <form onSubmit={envoyer} noValidate className="space-y-5 border-t-2 border-dashed border-ink pt-6">
-          <p className="font-mono text-xs tracking-widest text-rouge uppercase">Vos coordonnées</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-mono text-xs tracking-widest text-rouge uppercase">Vos coordonnées</p>
+            <p className="flex flex-wrap items-center gap-3 text-sm">
+              <span>
+                Connecté : <strong>{profil.email}</strong>
+              </span>
+              <button type="button" onClick={() => void compte.deconnecter()} className="inline-flex min-h-9 items-center gap-1 border-2 border-ink bg-paper px-3 font-display text-xs font-bold">
+                <LogOut aria-hidden size={14} /> Changer de compte
+              </button>
+            </p>
+          </div>
           <div className="grid gap-5 sm:grid-cols-2">
             {champ("nom", "Nom et prénom *", { autoComplete: "name", required: true })}
             {champ("entreprise", "Entreprise / organisation", { autoComplete: "organization" })}
-            {champ("email", "E-mail *", { type: "email", autoComplete: "email", inputMode: "email", required: true })}
+            {champ("email", "E-mail du compte", { type: "email", autoComplete: "email", inputMode: "email", readOnly: true })}
             {champ("telephone", "Téléphone / WhatsApp *", { type: "tel", autoComplete: "tel", inputMode: "tel", required: true, placeholder: "+225 07 00 00 00 00" })}
             {champ("date_souhaitee", "Date de livraison souhaitée", { type: "date" })}
           </div>

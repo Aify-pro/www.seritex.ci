@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
 import { type Vue } from "@/lib/marquage";
@@ -10,6 +10,7 @@ import { configurationInitiale, quantiteTotale, type Configuration, type Marquag
 import { EtapeArticle } from "./etape-article";
 import { EtapeEnvoi } from "./etape-envoi";
 import { EtapeMarquage } from "./etape-marquage";
+import { lireBrouillon, sauverBrouillon, effacerBrouillon } from "./brouillon";
 
 const ETAPES = ["Couleur & quantité", "Logo & emplacement", "Ma maquette"] as const;
 /** Libellés courts de la barre d'étapes sur mobile. */
@@ -22,12 +23,50 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
   const [vue, setVue] = useState<Vue>("face");
   const [actifId, setActifId] = useState(config.marquages[0]?.id ?? "");
   const haut = useRef<HTMLDivElement>(null);
+  // Brouillon gardé dans le navigateur : repris au retour (après identification, confirmation d'e-mail…).
+  const configDepart = useRef(config);
+  const [brouillonPret, setBrouillonPret] = useState(false);
+  const [repris, setRepris] = useState(false);
   // Zone de couleur dont la palette est ouverte (onglet), partagée avec l'aperçu.
   const [zoneActive, setZoneActive] = useState<string | null>(null);
   const apercuRef = useRef<HTMLDivElement>(null);
   const paletteRef = useRef<HTMLDivElement>(null);
   // Double appui sur une zone de l'aperçu : dernière zone touchée et quand.
   const dernierAppui = useRef<{ cle: string; t: number } | null>(null);
+
+  useEffect(() => {
+    let annule = false;
+    void lireBrouillon(modele).then((b) => {
+      if (annule) return;
+      if (b) {
+        setConfig(b.config);
+        setActifId(b.config.marquages[0]?.id ?? "");
+        setEtape(b.etape);
+        setRepris(true);
+      }
+      setBrouillonPret(true);
+    });
+    return () => {
+      annule = true;
+    };
+  }, [modele]);
+
+  // Sauvegarde (légèrement différée) dès que la composition a bougé.
+  useEffect(() => {
+    if (!brouillonPret || config === configDepart.current) return;
+    const t = setTimeout(() => void sauverBrouillon(modele.id, config, etape), 600);
+    return () => clearTimeout(t);
+  }, [brouillonPret, config, etape, modele.id]);
+
+  function repartirDeZero() {
+    void effacerBrouillon(modele.id);
+    const neuve = configurationInitiale(modele);
+    configDepart.current = neuve;
+    setConfig(neuve);
+    setActifId(neuve.marquages[0]?.id ?? "");
+    setEtape(0);
+    setRepris(false);
+  }
 
   function allerA(i: number) {
     setEtape(i);
@@ -125,6 +164,16 @@ export function Configurateur({ modele }: { modele: ModeleCatalogue }) {
 
   return (
     <div ref={haut} className="scroll-mt-24">
+      {repris ? (
+        <p role="status" className="mb-4 flex flex-wrap items-center gap-3 border-2 border-ink bg-orange/15 p-3 text-sm">
+          <span className="flex-1">
+            <strong className="font-display">Votre composition a été retrouvée</strong> sur cet appareil.
+          </span>
+          <button type="button" onClick={repartirDeZero} className="min-h-9 border-2 border-ink bg-paper px-3 font-display text-xs font-bold">
+            Repartir de zéro
+          </button>
+        </p>
+      ) : null}
       <ol className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2" aria-label="Étapes">
         {ETAPES.map((nom, i) => (
           <li key={nom}>

@@ -1,4 +1,5 @@
 import { nettoyerEnvoi } from "@/lib/envoi-personnalisation";
+import { sessionCourante } from "@/lib/compte";
 import { getReglages, MESSAGE_FERMETURE } from "@/lib/reglages-site";
 
 /**
@@ -18,6 +19,14 @@ export async function POST(request: Request) {
     raw = await request.json();
   } catch {
     return Response.json({ ok: false, message: "Requête invalide." }, { status: 400 });
+  }
+  // Envoi réservé aux personnes identifiées ; l'e-mail de la demande est celui du compte
+  // (c'est lui qui rattache la demande à la bonne fiche client).
+  const profil = await sessionCourante();
+  if (!profil) return Response.json({ ok: false, identification: true, message: "Identifiez-vous pour envoyer votre demande." }, { status: 401 });
+  if (raw && typeof raw === "object") {
+    const r = raw as { coordonnees?: Record<string, unknown> };
+    r.coordonnees = { ...(r.coordonnees ?? {}), email: profil.email };
   }
   const envoi = nettoyerEnvoi(raw);
   if (!envoi) return Response.json({ ok: false, message: "Composition incomplète : vérifiez vos coordonnées et la quantité." }, { status: 422 });
