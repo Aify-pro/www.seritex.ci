@@ -34,7 +34,7 @@ export function Footer() {
               </Link>
             </li>
             <li>
-              <a href={`${site.appUrl}/login`} className="hover:text-orange">
+              <a href="/espace-client" className="hover:text-orange">
                 Espace client
               </a>
             </li>

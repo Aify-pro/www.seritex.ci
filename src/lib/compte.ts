@@ -25,6 +25,8 @@ export type Profil = {
   entreprise: string;
   /** Le compte est-il déjà rattaché par Seritex à une fiche client ? */
   rattache: boolean;
+  /** Nom de la société (ou de la fiche particulier) une fois rattaché. */
+  societe: string | null;
 };
 
 type ErreurAuth = { status: number; code: string };
@@ -97,7 +99,8 @@ async function rest<T>(chemin: string, init: { method?: string; body?: unknown }
       console.error("[compte] appel plateforme refusé", chemin, res.status, await res.text());
       return null;
     }
-    return (await res.json().catch(() => null)) as T | null;
+    // Un PATCH réussi renvoie un corps vide : « {} » le distingue d'un échec (null).
+    return (await res.json().catch(() => ({}))) as T;
   } catch {
     return null;
   }
@@ -115,10 +118,10 @@ export async function creerProfil(u: { id: string; email: string; nom: string; t
   return !!res?.ok;
 }
 
-type LigneProfil = { id: string; email: string; full_name: string; telephone: string | null; entreprise_declaree: string | null; company_id: string | null };
+type LigneProfil = { id: string; email: string; full_name: string; phone: string | null; entreprise_declaree: string | null; company_id: string | null };
 
 async function profilDe(u: UtilisateurAuth): Promise<Profil | null> {
-  const lire = () => rest<LigneProfil[]>(`app_users?id=eq.${u.id}&select=id,email,full_name,telephone,entreprise_declaree,company_id`);
+  const lire = () => rest<LigneProfil[]>(`app_users?id=eq.${u.id}&select=id,email,full_name,phone,entreprise_declaree,company_id`);
   let l = (await lire())?.[0];
   if (!l) {
     // Profil manquant (création interrompue après l'inscription) : on le recrée depuis les infos d'inscription.
@@ -129,7 +132,8 @@ async function profilDe(u: UtilisateurAuth): Promise<Profil | null> {
     l = (await lire())?.[0];
   }
   if (!l) return null;
-  return { id: l.id, email: l.email, nom: l.full_name, telephone: l.telephone ?? "", entreprise: l.entreprise_declaree ?? "", rattache: !!l.company_id };
+  const societe = l.company_id ? ((await rest<{ name: string }[]>(`companies?id=eq.${l.company_id}&select=name`))?.[0]?.name ?? null) : null;
+  return { id: l.id, email: l.email, nom: l.full_name, telephone: l.phone ?? "", entreprise: l.entreprise_declaree ?? "", rattache: !!l.company_id, societe };
 }
 
 /**
@@ -138,6 +142,11 @@ async function profilDe(u: UtilisateurAuth): Promise<Profil | null> {
  * une route /api (les cookies ne s'écrivent pas depuis un composant serveur).
  */
 export async function sessionCourante(): Promise<Profil | null> {
+  return (await sessionAvecJeton())?.profil ?? null;
+}
+
+/** Comme sessionCourante, avec le jeton d'accès VALIDE (renouvelé au besoin) pour agir au nom de la personne. */
+export async function sessionAvecJeton(): Promise<{ profil: Profil; jeton: string } | null> {
   if (!comptesDisponibles()) return null;
   const c = await cookies();
   let at = c.get(AT)?.value;
@@ -154,11 +163,38 @@ export async function sessionCourante(): Promise<Profil | null> {
       await effacerSession();
     }
   }
-  if (!u || !u.ok) return null;
-  return profilDe(u.data);
+  if (!u || !u.ok || !at) return null;
+  const profil = await profilDe(u.data);
+  return profil ? { profil, jeton: at } : null;
 }
 
 export { profilDe };
+
+/**
+ * Mot de passe oublié : le lien n'est envoyé qu'à une adresse qui a un compte CLIENT
+ * (le personnel passe par la plateforme) ; la réponse est toujours la même, que
+ * l'adresse existe ou non. L'e-mail contient un lien vers /espace-client/reinitialiser
+ * avec un jeton qui n'est consommé que par le bouton de la page (jamais par un
+ * simple affichage : les antivirus de messagerie ouvrent les liens).
+ */
+export async function demanderRecuperation(email: string, redirectTo: string) {
+  const motif = email.replace(/[\\%_*]/g, (c) => `\\${c}`);
+  const trouve = await rest<{ id: string }[]>(`app_users?email=ilike.${encodeURIComponent(motif)}&role=eq.client&active=eq.true&select=id&limit=1`);
+  if (!trouve?.length) return;
+  await auth<unknown>(`recover?redirect_to=${encodeURIComponent(redirectTo)}`, { body: { email } });
+}
+
+/** Échange le jeton du lien e-mail contre une session de récupération (usage unique). */
+export const verifierRecuperation = (tokenHash: string) =>
+  auth<Jetons>("verify", { body: { type: "recovery", token_hash: tokenHash } });
+
+export const changerMotDePasse = (accessToken: string, motDePasse: string) =>
+  auth<unknown>("user", { method: "PUT", token: accessToken, body: { password: motDePasse } });
+
+/** Met à jour le téléphone du compte connecté (la seule coordonnée modifiable depuis le site). */
+export async function majTelephone(id: string, telephone: string) {
+  return (await rest<unknown>(`app_users?id=eq.${id}`, { method: "PATCH", body: { phone: telephone.trim().slice(0, 40) || null } })) !== null;
+}
 
 export const MOT_DE_PASSE_MIN = 8;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

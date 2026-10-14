@@ -3,7 +3,6 @@ import { CheckCircle2, LogIn } from "lucide-react";
 import { CtaBand } from "@/components/cta-band";
 import { Reveal } from "@/components/reveal";
 import { ButtonLink, Container, Etiquette, PageHero } from "@/components/ui";
-import { site } from "@/content/site";
 
 export const metadata: Metadata = {
   title: "Comment commander",
@@ -99,7 +98,7 @@ export default function CommanderPage() {
               <div className="mt-8 border-t-2 border-dashed border-ink pt-6">
                 <p className="font-display text-lg font-bold">Déjà client ?</p>
                 <p className="mt-1 text-muted">Retrouvez vos demandes, devis et commandes dans votre espace client.</p>
-                <a href={`${site.appUrl}/login`} className="mt-4 inline-flex min-h-11 items-center gap-2 font-display font-bold text-indigo underline decoration-2 underline-offset-4">
+                <a href="/espace-client" className="mt-4 inline-flex min-h-11 items-center gap-2 font-display font-bold text-indigo underline decoration-2 underline-offset-4">
                   <LogIn aria-hidden size={18} /> Accéder à mon espace
                 </a>
               </div>

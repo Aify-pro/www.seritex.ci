@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { Loader2, LogIn, MailCheck, UserPlus } from "lucide-react";
 import type { Profil } from "@/lib/compte";
@@ -209,9 +210,14 @@ export function Identification({ retour, onConnecte }: { retour: string; onConne
               {renvoi ? <p role="status" className="text-sm font-medium">{renvoi}</p> : null}
             </div>
           ) : null}
-          <button type="submit" disabled={occupe} className="btn-presse inline-flex min-h-12 items-center gap-2 border-2 border-ink bg-orange px-6 font-display text-lg font-bold text-ink disabled:opacity-60">
-            {occupe ? <Loader2 aria-hidden className="animate-spin" /> : <LogIn aria-hidden size={18} />} Me connecter
-          </button>
+          <div className="flex flex-wrap items-center gap-4">
+            <button type="submit" disabled={occupe} className="btn-presse inline-flex min-h-12 items-center gap-2 border-2 border-ink bg-orange px-6 font-display text-lg font-bold text-ink disabled:opacity-60">
+              {occupe ? <Loader2 aria-hidden className="animate-spin" /> : <LogIn aria-hidden size={18} />} Me connecter
+            </button>
+            <Link href="/espace-client/mot-de-passe-oublie" className="text-sm font-semibold underline">
+              Mot de passe oublié ?
+            </Link>
+          </div>
         </form>
       )}
     </div>
