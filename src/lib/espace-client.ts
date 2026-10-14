@@ -132,5 +132,78 @@ export async function detailDevis(jeton: string, id: string): Promise<DevisDetai
     total_tva: q.total_tva == null ? null : Number(q.total_tva), exoneration: q.tva_exoneration_motif,
     mode_reglement: q.mode_reglement, conditions_paiement: q.conditions_paiement, acompte_pct: Number(q.acompte_pct ?? 0),
     delai: libelleDelai(q.delai_valeur, q.delai_unite, q.delai_depart),
+    peut_accepter: q.status === "envoye" && !validiteDepassee(q.valid_until),
+    expire_le_jour: q.status === "envoye" && validiteDepassee(q.valid_until),
   };
+}
+
+/** Date de validité dépassée (jour inclus : valable jusqu'au soir de cette date, heure d'Abidjan). */
+function validiteDepassee(valideJusquAu: string | null): boolean {
+  if (!valideJusquAu) return false;
+  const aujourdhui = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Abidjan" });
+  return valideJusquAu < aujourdhui;
+}
+
+/** Le navigateur d'origine est bien notre propre site (garde supplémentaire des actions engageantes). */
+export function memeOrigine(req: Request): boolean {
+  const origine = req.headers.get("origin");
+  const hote = req.headers.get("host");
+  if (!origine || !hote) return false;
+  try {
+    return new URL(origine).host === hote;
+  } catch {
+    return false;
+  }
+}
+
+type Ecriture = { ok: true } | { ok: false; status: number; message: string };
+
+async function ecrire(jeton: string, chemin: string, body: unknown): Promise<Ecriture> {
+  try {
+    const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${chemin}`, {
+      method: "POST",
+      headers: { apikey: process.env.SUPABASE_ANON_KEY!, Authorization: `Bearer ${jeton}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+    if (res.ok) return { ok: true };
+    const j = (await res.json().catch(() => ({}))) as { message?: string };
+    console.error("[espace-client] écriture refusée", chemin, res.status, j.message);
+    return { ok: false, status: res.status, message: j.message ?? "" };
+  } catch {
+    return { ok: false, status: 0, message: "" };
+  }
+}
+
+export type ResultatAction = { ok: true } | { ok: false; code: "introuvable" | "indisponible" | "invalide" | "erreur"; message: string };
+
+/**
+ * Accepte un devis ENVOYÉ et encore valable. La décision est celle de la base (accept_quote : société du client,
+ * statut « envoyé », une seule fois) ; on ne fait ici qu'éviter d'appeler pour rien et traduire les refus.
+ */
+export async function accepterDevis(jeton: string, id: string): Promise<ResultatAction> {
+  const d = await detailDevis(jeton, id);
+  if (!d) return { ok: false, code: "introuvable", message: "Ce devis est introuvable." };
+  if (d.statut === "accepte") return { ok: false, code: "indisponible", message: "Ce devis est déjà accepté." };
+  if (d.expire_le_jour) return { ok: false, code: "indisponible", message: "Ce devis n'est plus valable. Contactez-nous pour en obtenir un nouveau." };
+  if (!d.peut_accepter) return { ok: false, code: "indisponible", message: "Ce devis ne peut pas être accepté en l'état." };
+  const r = await ecrire(jeton, "rpc/accept_quote", { p_quote_id: id });
+  if (r.ok) return r;
+  // Course (deux onglets) : la base a déjà enregistré l'acceptation.
+  if (/pas en attente/.test(r.message)) return { ok: false, code: "indisponible", message: "Ce devis a déjà été traité." };
+  return { ok: false, code: "erreur", message: "L'acceptation n'a pas pu être enregistrée. Rien n'a été validé : réessayez ou contactez-nous." };
+}
+
+export const MESSAGE_MAX = 4000;
+
+/** Écrit un message dans le fil d'une demande, sous le nom du client (la RLS refuse toute autre société). */
+export async function ecrireMessage(jeton: string, profilId: string, demandeId: string, texte: string): Promise<ResultatAction> {
+  const t = texte.trim();
+  if (!t) return { ok: false, code: "invalide", message: "Écrivez votre message." };
+  if (t.length > MESSAGE_MAX) return { ok: false, code: "invalide", message: `Message trop long (${MESSAGE_MAX} caractères maximum).` };
+  const visible = await lire<{ id: string }[]>(jeton, `requests?id=eq.${demandeId}&select=id`);
+  if (!visible?.length) return { ok: false, code: "introuvable", message: "Cette demande est introuvable." };
+  const r = await ecrire(jeton, "messages", { request_id: demandeId, sender_id: profilId, body: t });
+  if (r.ok) return r;
+  return { ok: false, code: "erreur", message: "Votre message n'a pas pu être envoyé. Réessayez." };
 }

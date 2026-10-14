@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-type Etat<T> = { statut: "charge" | "ok" | "introuvable" | "erreur" | "deconnecte"; donnees: T | null };
+type Etat<T> = { statut: "charge" | "ok" | "introuvable" | "erreur" | "deconnecte"; donnees: T | null; recharger: () => void };
 
 /** Lit une route /api/espace-client/* ; la clé d'état évite d'afficher l'ancienne réponse pendant un changement d'adresse. */
 export function useDonnees<T>(url: string): Etat<T> {
-  const [etat, setEtat] = useState<Etat<T> & { url: string }>({ url, statut: "charge", donnees: null });
+  const [version, setVersion] = useState(0);
+  const recharger = useCallback(() => setVersion((v) => v + 1), []);
+  const [etat, setEtat] = useState<Omit<Etat<T>, "recharger"> & { url: string }>({ url, statut: "charge", donnees: null });
   useEffect(() => {
     let actif = true;
     fetch(url, { cache: "no-store" })
@@ -19,6 +21,6 @@ export function useDonnees<T>(url: string): Etat<T> {
     return () => {
       actif = false;
     };
-  }, [url]);
-  return etat.url === url ? etat : { statut: "charge", donnees: null };
+  }, [url, version]);
+  return etat.url === url ? { ...etat, recharger } : { statut: "charge", donnees: null, recharger };
 }

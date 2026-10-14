@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { formatDateFr, formatMontant, STATUT_DEMANDE, STATUT_DEVIS, type DemandeDetail } from "@/lib/espace-client-types";
 import { Chargement, Ecran, Message, Pastille } from "./ecran";
+import { EcrireMessage } from "./ecrire-message";
 import { useDonnees } from "./use-donnees";
 
 const bloc = "border-2 border-ink bg-paper p-5 shadow-hard-sm";
@@ -91,7 +92,7 @@ function Detail({ id }: { id: string }) {
             ))}
           </ul>
         )}
-        <p className="mt-4 text-sm text-muted">Pour répondre, écrivez-nous à info@seritex.ci en rappelant la référence {d.reference}.</p>
+        <EcrireMessage demandeId={d.id} apres={r.recharger} />
       </section>
     </div>
   );

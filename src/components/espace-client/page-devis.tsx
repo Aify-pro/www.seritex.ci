@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { formatDateFr, formatMontant, STATUT_DEVIS, type DevisDetail } from "@/lib/espace-client-types";
 import { Chargement, Ecran, Message, Pastille } from "./ecran";
+import { AccepterDevis } from "./accepter-devis";
 import { useDonnees } from "./use-donnees";
 
 const bloc = "border-2 border-ink bg-paper p-5 shadow-hard-sm";
@@ -76,6 +77,18 @@ function Detail({ id }: { id: string }) {
         </dl>
       </section>
 
+      {q.peut_accepter && <AccepterDevis devis={q} apres={r.recharger} />}
+      {q.expire_le_jour && (
+        <p role="status" className="border-2 border-ink bg-orange/15 p-4">
+          Ce devis n&apos;est plus valable. Contactez-nous à info@seritex.ci pour en obtenir un nouveau.
+        </p>
+      )}
+      {q.statut === "accepte" && (
+        <p role="status" className="border-2 border-ink bg-paper p-4">
+          Vous avez accepté ce devis : votre commande est lancée. Nous revenons vers vous pour la suite.
+        </p>
+      )}
+
       <section className={bloc} aria-labelledby="conditions">
         <h2 id="conditions" className="font-display text-xl font-black">Conditions</h2>
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
@@ -85,7 +98,9 @@ function Detail({ id }: { id: string }) {
           {q.mode_reglement && (<><dt className="font-bold">Mode de règlement</dt><dd>{q.mode_reglement}</dd></>)}
           {q.conditions_paiement && (<><dt className="font-bold">Conditions de paiement</dt><dd className="whitespace-pre-line">{q.conditions_paiement}</dd></>)}
         </dl>
-        <p className="mt-4 text-sm text-muted">Pour accepter ce devis ou poser une question, écrivez-nous à info@seritex.ci en rappelant la référence {q.reference}.</p>
+        <p className="mt-4 text-sm text-muted">
+          Une question sur ce devis ? Écrivez-nous depuis {q.demande ? <Link href={`/espace-client/demandes/${q.demande.id}`} className="font-bold underline">la page de votre demande</Link> : "votre demande"}, ou à info@seritex.ci.
+        </p>
       </section>
     </div>
   );

@@ -72,6 +72,10 @@ export type DevisDetail = DevisResume & {
   conditions_paiement: string | null;
   acompte_pct: number;
   delai: string | null;
+  /** Calculé côté serveur : devis envoyé, encore valable. */
+  peut_accepter: boolean;
+  /** Devis envoyé dont la date de validité est dépassée. */
+  expire_le_jour: boolean;
 };
 
 const UNITES: Record<string, [string, string]> = {
