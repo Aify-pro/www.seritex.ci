@@ -1,0 +1,89 @@
+"use client";
+
+import Link from "next/link";
+import { Building2, Clock, Loader2, ShoppingBag, UserRound } from "lucide-react";
+import { Identification } from "@/components/compte/identification";
+import { useCompte } from "@/components/compte/use-compte";
+import { CadreEspace } from "./cadre";
+
+const carte = "block border-2 border-ink bg-paper p-5 shadow-hard-sm transition hover:-translate-y-0.5";
+
+/** Accueil de l'espace client : connexion / création de compte, attente de rattachement, ou tableau d'accueil. */
+export function AccueilEspaceClient() {
+  const compte = useCompte();
+  const profil = compte.profil;
+
+  if (!compte.charge) {
+    return (
+      <p role="status" className="text-muted">
+        <Loader2 aria-hidden className="mr-2 inline animate-spin" size={16} /> Chargement…
+      </p>
+    );
+  }
+
+  if (!compte.disponible) {
+    return (
+      <div role="alert" className="max-w-xl border-2 border-ink bg-orange/15 p-6">
+        <p className="font-display text-2xl font-black">L&apos;espace client est momentanément indisponible.</p>
+        <p className="mt-2 text-muted">Votre conseiller reste joignable pour toute demande.</p>
+        <Link href="/devis" className="mt-4 inline-flex min-h-12 items-center border-2 border-ink bg-orange px-5 font-display font-bold">
+          Demander un devis
+        </Link>
+      </div>
+    );
+  }
+
+  if (!profil) {
+    return (
+      <div className="grid gap-8 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <p className="font-mono text-xs tracking-widest text-rouge uppercase">Espace client</p>
+          <h1 className="mt-2 font-display text-4xl leading-[0.95] font-black tracking-tighter sm:text-5xl">Votre espace Seritex.</h1>
+          <p className="mt-4 text-lg text-muted">
+            Retrouvez ici vos demandes de devis et, bientôt, vos devis, le suivi de vos commandes et vos livraisons. Un seul compte, aussi pour commander sur l&apos;e-shop.
+          </p>
+        </div>
+        <div className="border-2 border-ink bg-paper p-5 shadow-hard sm:p-8 lg:col-span-7">
+          <Identification retour="/espace-client" onConnecte={compte.connecte} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <CadreEspace profil={profil} titre={`Bonjour ${profil.nom.split(" ")[0]}.`} deconnecter={() => void compte.deconnecter()}>
+      {!profil.rattache ? (
+        <div role="status" className="max-w-2xl space-y-3 border-2 border-ink bg-orange/15 p-6">
+          <Clock aria-hidden className="text-indigo" size={36} />
+          <h2 className="font-display text-2xl font-black">Votre compte est en cours de rattachement.</h2>
+          <p>
+            Votre inscription est bien enregistrée. Notre équipe la rattache à votre fiche client : vos demandes et vos devis apparaîtront ici ensuite.
+            Vous pouvez déjà composer vos articles sur l&apos;e-shop et envoyer une demande.
+          </p>
+          <p className="text-sm text-muted">Une question ? info@seritex.ci</p>
+        </div>
+      ) : (
+        <p className="mb-6 inline-flex items-center gap-2 border-2 border-ink bg-paper px-3 py-2 text-sm">
+          <Building2 aria-hidden size={16} className="text-rouge" /> <strong>{profil.societe}</strong>
+        </p>
+      )}
+      <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+        <li>
+          <Link href="/e-shop" className={carte}>
+            <ShoppingBag aria-hidden className="text-rouge" />
+            <p className="mt-2 font-display text-xl font-black">Composer un article</p>
+            <p className="text-sm text-muted">Choisissez, ajoutez votre logo, envoyez une demande de devis.</p>
+          </Link>
+        </li>
+        <li>
+          <Link href="/espace-client/compte" className={carte}>
+            <UserRound aria-hidden className="text-rouge" />
+            <p className="mt-2 font-display text-xl font-black">Mon compte</p>
+            <p className="text-sm text-muted">Vos coordonnées et votre mot de passe.</p>
+          </Link>
+        </li>
+      </ul>
+      <p className="mt-8 max-w-2xl text-sm text-muted">Vos demandes, vos devis, le suivi de vos commandes et vos livraisons arrivent dans cet espace très prochainement.</p>
+    </CadreEspace>
+  );
+}

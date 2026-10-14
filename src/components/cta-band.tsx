@@ -1,5 +1,4 @@
 import { ArrowRight, LogIn } from "lucide-react";
-import { site } from "@/content/site";
 import { ButtonLink, Container } from "./ui";
 
 export function CtaBand() {
@@ -20,7 +19,7 @@ export function CtaBand() {
             Demander un devis <ArrowRight aria-hidden size={20} />
           </ButtonLink>
           <a
-            href={`${site.appUrl}/login`}
+            href="/espace-client"
             className="inline-flex min-h-12 items-center gap-2 font-display font-bold underline decoration-2 underline-offset-4 hover:text-indigo"
           >
             <LogIn aria-hidden size={18} /> Déjà client ? Suivez vos commandes
