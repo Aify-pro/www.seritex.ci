@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X, LogIn } from "lucide-react";
 import { nav, site } from "@/content/site";
+import { LienPanier } from "@/components/eshop/lien-panier";
 
 /** `eshop` : lien vers l'e-shop, affiché seulement quand il est activé dans la plateforme (Paramètres > Site web). */
 export function Header({ eshop = false }: { eshop?: boolean }) {
@@ -58,6 +59,7 @@ export function Header({ eshop = false }: { eshop?: boolean }) {
         </nav>
 
         <div className="hidden items-center gap-3 xl:flex">
+          {eshop ? <LienPanier /> : null}
           <a
             href={`${site.appUrl}/login`}
             className="inline-flex min-h-11 items-center gap-2 px-3 font-display text-sm font-semibold whitespace-nowrap hover:text-indigo"
@@ -95,6 +97,11 @@ export function Header({ eshop = false }: { eshop?: boolean }) {
                 </Link>
               </li>
             ))}
+            {eshop ? (
+              <li className="border-b border-white/20">
+                <LienPanier className="!text-2xl py-4 font-bold" />
+              </li>
+            ) : null}
             <li className="border-b border-white/20">
               <a href={`${site.appUrl}/login`} className="flex items-center gap-2 py-4 font-display text-2xl font-bold">
                 <LogIn aria-hidden /> Espace client

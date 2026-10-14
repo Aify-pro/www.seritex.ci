@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type FormEvent } from "react";
-import { AlertTriangle, Check, CheckCircle2, Download, FileImage, Lightbulb, Loader2, LogOut, Send } from "lucide-react";
-import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
-import { validerCoordonnees, type Coordonnees, type ErreursCoordonnees, type FichierDepose, type MarquageEnvoye } from "@/lib/envoi-personnalisation";
+import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
+import { AlertTriangle, Check, CheckCircle2, Download, FileImage, Lightbulb, Loader2, LogOut, PlusCircle, ShoppingBag } from "lucide-react";
+import { slugModele, type ModeleCatalogue } from "@/lib/catalogue-plateforme";
+import type { MarquageEnvoye } from "@/lib/envoi-personnalisation";
 import { imageMaquette, pdfMaquette, telecharger, type ContenuMaquette } from "@/lib/maquette";
 import { controler, debordeDuVetement, decrirePosition, formatCm, getTechnique, rapportMarquage, techniqueAvecArticle } from "@/lib/marquage";
 import { couleurSousMarquage, mockupPour, placementDe, viewBoxDe } from "@/lib/gabarit";
@@ -14,17 +15,14 @@ import { libelleEmplacement } from "./etape-marquage";
 import { Titre } from "./ui";
 import { Identification } from "@/components/compte/identification";
 import { useCompte } from "@/components/compte/use-compte";
-import { effacerBrouillon } from "./brouillon";
+import { effacerBrouillon, versStocke } from "./brouillon";
+import { ajouterAuPanier, type ArticlePanier } from "./panier";
 
 type Etat =
   | { kind: "saisie" }
-  | { kind: "envoi"; etape: string }
-  | { kind: "envoye"; reference: string | null }
-  | { kind: "ferme"; message: string }
+  | { kind: "ajout"; etape: string }
+  | { kind: "ajoute" }
   | { kind: "erreur"; message: string };
-
-const inputCls =
-  "mt-1 block min-h-12 w-full border-2 border-ink bg-paper px-4 py-3 text-base text-ink placeholder:text-muted/70 focus:border-indigo focus:outline-none aria-[invalid=true]:border-rouge";
 
 export function EtapeEnvoi({
   modele,
@@ -52,16 +50,11 @@ export function EtapeEnvoi({
   // Gros plans cotés, un par marquage (pour la page et le PDF).
   const zooms = useRef(new Map<string, SVGSVGElement>());
   const [etat, setEtat] = useState<Etat>({ kind: "saisie" });
-  const [erreurs, setErreurs] = useState<ErreursCoordonnees>({});
-  const [coord, setCoord] = useState<Coordonnees>({ nom: "", entreprise: "", email: "", telephone: "", date_souhaitee: "", message: "" });
   const [prepa, setPrepa] = useState<"pdf" | "image" | null>(null);
   const compte = useCompte();
   const profil = compte.profil;
 
-  // Personne identifiée : ses coordonnées pré-remplissent le formulaire (l'e-mail est celui du compte).
-  const coordonnees: Coordonnees = profil
-    ? { ...coord, nom: coord.nom || profil.nom, entreprise: coord.entreprise || profil.entreprise, email: profil.email, telephone: coord.telephone || profil.telephone }
-    : coord;
+  const router = useRouter();
 
   const forme = formePour(modele.nom, modele.sousFamille);
   const sansCadre = apercus.map((a) => ({ ...a, actif: false }));
@@ -127,7 +120,7 @@ export function EtapeEnvoi({
     return {
       vues,
       reference,
-      client: coordonnees.nom ? [coordonnees.nom, coordonnees.entreprise].filter(Boolean).join(" — ") : undefined,
+      client: profil ? [profil.nom, profil.entreprise].filter(Boolean).join(" — ") : undefined,
       couleurTextile: { nom: couleur, hex: couleurHex },
       article: [
         { libelle: "Article", valeur: modele.nom },
@@ -178,51 +171,18 @@ export function EtapeEnvoi({
     }
   }
 
-  async function envoyer(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const piege = new FormData(e.currentTarget).get("site_web");
-    const errs = validerCoordonnees(coordonnees);
-    setErreurs(errs);
-    if (Object.keys(errs).length) {
-      e.currentTarget.querySelector<HTMLElement>(`[name="${Object.keys(errs)[0]}"]`)?.focus();
-      return;
-    }
-
+  /** Range l'article dans le panier (maquette PDF et logos compris) ; `valider` ouvre ensuite la page panier pour envoyer la demande. */
+  async function ajouter(valider: boolean) {
     try {
-      setEtat({ kind: "envoi", etape: "Préparation de votre maquette…" });
+      setEtat({ kind: "ajout", etape: "Préparation de votre maquette…" });
       const pdf = await pdfMaquette(contenu());
+      const apercu = await imageMaquette([face.current!, ...(aDos && dos.current ? [dos.current] : [])]).catch(() => null);
 
-      // Fichiers : chaque logo une seule fois (il peut servir à plusieurs marquages), puis la maquette.
+      // Chaque logo une seule fois (il peut servir à plusieurs marquages).
       const logos: { fichier: File; marquage: number }[] = [];
       config.marquages.forEach((m, i) => {
         if (m.logo && !logos.some((l) => l.fichier === m.logo!.fichier)) logos.push({ fichier: m.logo.fichier, marquage: i + 1 });
       });
-      const maquette = new File([pdf], "maquette.pdf", { type: "application/pdf" });
-      const aEnvoyer = [...logos.map((l) => l.fichier), maquette];
-
-      setEtat({ kind: "envoi", etape: "Envoi de vos fichiers…" });
-      const prep = await fetch("/api/personnaliser/preparer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ site_web: piege, fichiers: aEnvoyer.map((f) => ({ nom: f.name, type: f.type || "application/octet-stream", taille: f.size })) }),
-      });
-      const p = await prep.json();
-      if (p.ferme) return setEtat({ kind: "ferme", message: p.message });
-      if (p.identification) {
-        void compte.actualiser();
-        return setEtat({ kind: "erreur", message: p.message });
-      }
-      if (!prep.ok || !p.ok) return setEtat({ kind: "erreur", message: p.message ?? "Envoi impossible pour le moment." });
-
-      const deposes: FichierDepose[] = [];
-      for (const [i, f] of aEnvoyer.entries()) {
-        const depot = p.depots[i] as { path: string; url: string };
-        const res = await fetch(depot.url, { method: "PUT", body: f, headers: { "Content-Type": f.type || "application/octet-stream", "x-upsert": "false" } });
-        if (!res.ok) return setEtat({ kind: "erreur", message: `Le fichier « ${f.name} » n'a pas pu être envoyé. Réessayez.` });
-        deposes.push(i < logos.length ? { path: depot.path, nom: f.name, role: "logo", marquage: logos[i].marquage } : { path: depot.path, nom: "maquette.pdf", role: "maquette" });
-      }
-
-      setEtat({ kind: "envoi", etape: "Transmission à Seritex…" });
       const marquages: MarquageEnvoye[] = marquagesDetail.map(({ m, alertes, libelle }) => ({
         emplacement_id: m.emplacementId,
         emplacement_libelle: libelle,
@@ -237,91 +197,45 @@ export function EtapeEnvoi({
         decalage_y_cm: m.dyCm,
         rotation_deg: m.rotation,
       }));
-      const res = await fetch("/api/personnaliser/envoyer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          envoi_id: p.envoiId,
-          coordonnees,
+
+      const article: Omit<ArticlePanier, "id" | "ajouteLe"> = {
+        modeleId: modele.id,
+        slug: slugModele(modele),
+        nom: modele.nom,
+        resume: {
+          couleur,
+          couleurHex,
+          grammage,
+          quantite: total,
+          marquages: marquagesDetail.map(({ m, emplacement, dimensions }) => `${emplacement} · ${dimensions} · ${getTechnique(m.technique).label}`),
+        },
+        config: versStocke(config),
+        etape: 2,
+        envoi: {
           modele_id: modele.id,
           couleur_id: config.couleurId || null,
           couleurs_zones: config.couleursZones,
           textile_id: config.grammageId,
           quantite: total,
-          repartition: config.repartition
-            ? Object.fromEntries(Object.entries(config.repartition).map(([k, v]) => [k, Number.parseInt(v, 10) || 0]))
-            : null,
+          repartition: config.repartition ? Object.fromEntries(Object.entries(config.repartition).map(([k, v]) => [k, Number.parseInt(v, 10) || 0])) : null,
           marquages,
-          fichiers: deposes,
-        }),
-      });
-      const r = await res.json();
-      if (r.ferme) return setEtat({ kind: "ferme", message: r.message });
-      if (r.identification) {
-        void compte.actualiser();
-        return setEtat({ kind: "erreur", message: r.message });
+        },
+        logos,
+        maquette: pdf,
+        apercu,
+      };
+      if (!(await ajouterAuPanier(article))) {
+        return setEtat({ kind: "erreur", message: "Votre navigateur ne permet pas de conserver le panier (navigation privée ?). Téléchargez votre maquette et joignez-la à une demande de devis." });
       }
-      if (!res.ok || !r.ok) return setEtat({ kind: "erreur", message: r.message ?? "Envoi impossible pour le moment." });
-      void effacerBrouillon(modele.id);
-      setEtat({ kind: "envoye", reference: r.reference ?? null });
+      await effacerBrouillon(modele.id);
+      if (valider) return router.push("/e-shop/panier");
+      setEtat({ kind: "ajoute" });
     } catch {
-      setEtat({ kind: "erreur", message: "Connexion impossible. Vérifiez votre réseau et réessayez : votre composition est conservée." });
+      setEtat({ kind: "erreur", message: "L'article n'a pas pu être ajouté. Réessayez : votre composition est conservée." });
     }
   }
 
-  const aria = (k: keyof Coordonnees) => ({
-    "aria-invalid": erreurs[k] ? true : undefined,
-    "aria-describedby": erreurs[k] ? `${k}-erreur` : undefined,
-  });
-  const champ = (k: keyof Coordonnees, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
-    <div>
-      <label htmlFor={`c-${k}`} className="font-display font-semibold">
-        {label}
-      </label>
-      <input
-        id={`c-${k}`}
-        name={k}
-        value={coordonnees[k]}
-        onChange={(e) => setCoord({ ...coord, [k]: e.target.value })}
-        className={inputCls}
-        {...aria(k)}
-        {...props}
-      />
-      {erreurs[k] ? (
-        <p id={`${k}-erreur`} role="alert" className="mt-1 text-sm font-medium text-rouge">
-          {erreurs[k]}
-        </p>
-      ) : null}
-    </div>
-  );
-
-  if (etat.kind === "envoye") {
-    return (
-      <div role="status" className="space-y-4">
-        <CheckCircle2 aria-hidden className="text-indigo" size={48} />
-        <h2 className="font-display text-3xl font-black">Composition bien reçue.</h2>
-        {etat.reference ? <p className="font-mono text-sm tracking-widest text-rouge uppercase">Référence {etat.reference}</p> : null}
-        <p className="text-lg text-muted">
-          Votre conseiller Seritex étudie votre maquette et vous recontacte pour le devis. Le BAT vous sera soumis avant toute production.
-        </p>
-        <button
-          type="button"
-          onClick={() => void telechargerPdf(etat.reference)}
-          className="inline-flex min-h-12 items-center gap-2 border-2 border-ink bg-paper px-5 font-display font-bold"
-        >
-          <Download aria-hidden size={18} /> Télécharger ma maquette (PDF)
-        </button>
-        {/* Les vues restent montées pour pouvoir régénérer la maquette. */}
-        <div className="sr-only" aria-hidden>
-          <Apercu ref={face} vue="face" couleurHex={couleurHex} forme={forme} marquages={sansCadre} mockup={mockupPour(modele, "face")} couleursZones={couleursZonesHex} />
-          {aDos ? <Apercu ref={dos} vue="dos" couleurHex={couleurHex} forme={forme} marquages={sansCadre} mockup={mockupPour(modele, "dos")} couleursZones={couleursZonesHex} /> : null}
-          {grosPlans(true)}
-        </div>
-      </div>
-    );
-  }
-
-  const occupe = etat.kind === "envoi";
+  const occupe = etat.kind === "ajout";
 
   return (
     <div className="space-y-8">
@@ -504,15 +418,7 @@ export function EtapeEnvoi({
         </button>
       </div>
 
-      {etat.kind === "ferme" ? (
-        <div role="alert" className="border-2 border-ink bg-orange/15 p-5">
-          <p className="font-display text-lg font-bold">{etat.message}</p>
-          <p className="mt-2 text-sm text-muted">Votre composition reste affichée : téléchargez-la et joignez-la à votre demande de devis.</p>
-          <Link href="/devis" className="mt-4 inline-flex min-h-12 items-center border-2 border-ink bg-orange px-5 font-display font-bold">
-            Demander un devis
-          </Link>
-        </div>
-      ) : !compte.charge ? (
+      {!compte.charge ? (
         <p className="border-t-2 border-dashed border-ink pt-6 text-muted" role="status">
           <Loader2 aria-hidden className="mr-2 inline animate-spin" size={16} /> Vérification de votre identification…
         </p>
@@ -528,63 +434,58 @@ export function EtapeEnvoi({
             </Link>
           </div>
         )
+      ) : etat.kind === "ajoute" ? (
+        <div role="status" className="space-y-4 border-2 border-ink bg-orange/15 p-5">
+          <CheckCircle2 aria-hidden className="text-indigo" size={40} />
+          <h3 className="font-display text-2xl font-black">Article ajouté à votre panier.</h3>
+          <p>Vous pouvez en ajouter d&apos;autres : toute votre sélection partira dans une seule demande de devis.</p>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/e-shop" className="inline-flex min-h-12 items-center gap-2 border-2 border-ink bg-paper px-5 font-display font-bold">
+              <PlusCircle aria-hidden size={18} /> Ajouter un autre article
+            </Link>
+            <Link href="/e-shop/panier" className="btn-presse inline-flex min-h-12 items-center gap-2 border-2 border-ink bg-orange px-5 font-display font-bold text-ink">
+              <ShoppingBag aria-hidden size={18} /> Voir mon panier et valider
+            </Link>
+          </div>
+        </div>
       ) : (
-        <form onSubmit={envoyer} noValidate className="space-y-5 border-t-2 border-dashed border-ink pt-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-mono text-xs tracking-widest text-rouge uppercase">Vos coordonnées</p>
-            <p className="flex flex-wrap items-center gap-3 text-sm">
-              <span>
-                Connecté : <strong>{profil.email}</strong>
-              </span>
-              <button type="button" onClick={() => void compte.deconnecter()} className="inline-flex min-h-9 items-center gap-1 border-2 border-ink bg-paper px-3 font-display text-xs font-bold">
-                <LogOut aria-hidden size={14} /> Changer de compte
-              </button>
-            </p>
-          </div>
-          <div className="grid gap-5 sm:grid-cols-2">
-            {champ("nom", "Nom et prénom *", { autoComplete: "name", required: true })}
-            {champ("entreprise", "Entreprise / organisation", { autoComplete: "organization" })}
-            {champ("email", "E-mail du compte", { type: "email", autoComplete: "email", inputMode: "email", readOnly: true })}
-            {champ("telephone", "Téléphone / WhatsApp *", { type: "tel", autoComplete: "tel", inputMode: "tel", required: true, placeholder: "+225 07 00 00 00 00" })}
-            {champ("date_souhaitee", "Date de livraison souhaitée", { type: "date" })}
-          </div>
-          <div>
-            <label htmlFor="c-message" className="font-display font-semibold">
-              Un message pour votre conseiller ?
-            </label>
-            <textarea
-              id="c-message"
-              name="message"
-              rows={3}
-              maxLength={3000}
-              value={coord.message}
-              onChange={(e) => setCoord({ ...coord, message: e.target.value })}
-              className={inputCls}
-            />
-          </div>
-          {/* Champ piège pour les robots : invisible pour un humain. */}
-          <div aria-hidden className="absolute -left-[9999px]" tabIndex={-1}>
-            <label>
-              Site web <input name="site_web" tabIndex={-1} autoComplete="off" />
-            </label>
-          </div>
+        <div className="space-y-4 border-t-2 border-dashed border-ink pt-6">
+          <p className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <span>
+              Connecté : <strong>{profil.email}</strong>
+            </span>
+            <button type="button" onClick={() => void compte.deconnecter()} className="inline-flex min-h-9 items-center gap-1 border-2 border-ink bg-paper px-3 font-display text-xs font-bold">
+              <LogOut aria-hidden size={14} /> Changer de compte
+            </button>
+          </p>
           {etat.kind === "erreur" ? (
             <p role="alert" className="font-medium text-rouge">
               {etat.message}
             </p>
           ) : null}
-          <button
-            type="submit"
-            disabled={occupe}
-            className="btn-presse inline-flex min-h-12 items-center gap-2 border-2 border-ink bg-orange px-6 font-display text-lg font-bold text-ink disabled:opacity-60"
-          >
-            {occupe ? <Loader2 aria-hidden className="animate-spin" /> : <Send aria-hidden size={18} />}
-            {occupe ? etat.etape : "Envoyer à Seritex"}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={occupe || !!prepa}
+              onClick={() => void ajouter(false)}
+              className="inline-flex min-h-12 items-center gap-2 border-2 border-ink bg-paper px-6 font-display text-lg font-bold disabled:opacity-60"
+            >
+              {occupe ? <Loader2 aria-hidden className="animate-spin" /> : <PlusCircle aria-hidden size={18} />}
+              {occupe ? etat.etape : "Ajouter au panier"}
+            </button>
+            <button
+              type="button"
+              disabled={occupe || !!prepa}
+              onClick={() => void ajouter(true)}
+              className="btn-presse inline-flex min-h-12 items-center gap-2 border-2 border-ink bg-orange px-6 font-display text-lg font-bold text-ink disabled:opacity-60"
+            >
+              <ShoppingBag aria-hidden size={18} /> Valider ma demande
+            </button>
+          </div>
           <p className="text-sm text-muted">
-            Vos coordonnées servent uniquement à vous recontacter pour ce projet. Vos fichiers sont transmis à Seritex et ne sont pas publiés.
+            Ajoutez autant d&apos;articles que vous voulez : une seule demande, un seul devis. Aucun engagement, le BAT vous est soumis avant toute production.
           </p>
-        </form>
+        </div>
       )}
     </div>
   );

@@ -1,10 +1,10 @@
-import { nettoyerEnvoi } from "@/lib/envoi-personnalisation";
+import { nettoyerDemande } from "@/lib/envoi-personnalisation";
 import { sessionCourante } from "@/lib/compte";
 import { getReglages, MESSAGE_FERMETURE } from "@/lib/reglages-site";
 
 /**
- * Étape 2 de l'envoi « Personnaliser » : crée la demande dans la plateforme
- * (create_site_personnalisation, migration 0110). La base refait tous les
+ * Étape 2 de l'envoi du panier : crée la demande dans la plateforme
+ * (create_site_demande, migration 0126). La base refait tous les
  * contrôles (outil activé, article publiable, couleur, grammage,
  * emplacements, fichiers réellement déposés) et applique le même anti-abus
  * que le formulaire de devis.
@@ -28,14 +28,14 @@ export async function POST(request: Request) {
     const r = raw as { coordonnees?: Record<string, unknown> };
     r.coordonnees = { ...(r.coordonnees ?? {}), email: profil.email };
   }
-  const envoi = nettoyerEnvoi(raw);
-  if (!envoi) return Response.json({ ok: false, message: "Composition incomplète : vérifiez vos coordonnées et la quantité." }, { status: 422 });
+  const envoi = nettoyerDemande(raw);
+  if (!envoi) return Response.json({ ok: false, message: "Demande incomplète : vérifiez vos coordonnées et vos articles." }, { status: 422 });
 
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return Response.json({ ok: false, message: "Envoi momentanément indisponible." }, { status: 503 });
 
-  const res = await fetch(`${url}/rest/v1/rpc/create_site_personnalisation`, {
+  const res = await fetch(`${url}/rest/v1/rpc/create_site_demande`, {
     method: "POST",
     headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     cache: "no-store",
@@ -43,14 +43,16 @@ export async function POST(request: Request) {
       p: {
         envoi_id: envoi.envoi_id,
         ...envoi.coordonnees,
-        modele_id: envoi.modele_id,
-        couleur_id: envoi.couleur_id,
-        textile_id: envoi.textile_id,
-        quantite: String(envoi.quantite),
         // Facultatifs : omis plutôt qu'envoyés à null (la base lit ces champs comme des objets JSON).
-        ...(envoi.couleurs_zones ? { couleurs_zones: envoi.couleurs_zones } : {}),
-        ...(envoi.repartition ? { repartition: envoi.repartition } : {}),
-        marquages: envoi.marquages,
+        articles: envoi.articles.map((a) => ({
+          modele_id: a.modele_id,
+          couleur_id: a.couleur_id,
+          textile_id: a.textile_id,
+          quantite: String(a.quantite),
+          ...(a.couleurs_zones ? { couleurs_zones: a.couleurs_zones } : {}),
+          ...(a.repartition ? { repartition: a.repartition } : {}),
+          marquages: a.marquages,
+        })),
         fichiers: envoi.fichiers,
       },
     }),

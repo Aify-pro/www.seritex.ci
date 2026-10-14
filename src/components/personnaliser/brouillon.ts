@@ -1,4 +1,5 @@
 import { chargerLogo } from "@/lib/analyse-logo";
+import { executer } from "@/lib/idb";
 import type { ModeleCatalogue } from "@/lib/catalogue-plateforme";
 import type { Configuration, Marquage } from "./etat";
 
@@ -10,66 +11,36 @@ import type { Configuration, Marquage } from "./etat";
  * composition reste simplement non sauvegardée.
  */
 
-const BASE = "seritex-site";
 const MAGASIN = "brouillons";
 const VALIDITE_MS = 14 * 24 * 3600 * 1000;
 
 type MarquageStocke = Omit<Marquage, "logo"> & { logo: { nom: string; fichier: File } | null };
-type Stocke = { v: 1; t: number; etape: number; config: Omit<Configuration, "marquages"> & { marquages: MarquageStocke[] } };
+/** Composition telle qu'elle est gardée dans le navigateur (le logo est le fichier, pas son analyse). */
+export type ConfigStockee = Omit<Configuration, "marquages"> & { marquages: MarquageStocke[] };
+type Stocke = { v: 1; t: number; etape: number; config: ConfigStockee };
 
-function ouvrir(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    try {
-      const req = indexedDB.open(BASE, 1);
-      req.onupgradeneeded = () => req.result.createObjectStore(MAGASIN);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-      req.onblocked = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
-}
+export const versStocke = (config: Configuration): ConfigStockee => ({
+  ...config,
+  marquages: config.marquages.map((m) => ({ ...m, logo: m.logo ? { nom: m.logo.nom, fichier: m.logo.fichier } : null })),
+});
 
-async function executer<T>(mode: IDBTransactionMode, f: (s: IDBObjectStore) => IDBRequest<T>): Promise<T | null> {
-  const db = await ouvrir();
-  if (!db) return null;
-  return new Promise((resolve) => {
-    try {
-      const tx = db.transaction(MAGASIN, mode);
-      const req = f(tx.objectStore(MAGASIN));
-      tx.oncomplete = () => {
-        db.close();
-        resolve(req.result ?? null);
-      };
-      tx.onerror = tx.onabort = () => {
-        db.close();
-        resolve(null);
-      };
-    } catch {
-      db.close();
-      resolve(null);
-    }
-  });
+/** Écrit directement un brouillon (ex. « Modifier » un article du panier : il revient dans le configurateur). */
+export async function ecrireBrouillon(modeleId: string, config: ConfigStockee, etape: number) {
+  const stocke: Stocke = { v: 1, t: Date.now(), etape, config };
+  await executer(MAGASIN, "readwrite", (s) => s.put(stocke, modeleId));
 }
 
 export async function sauverBrouillon(modeleId: string, config: Configuration, etape: number) {
-  const stocke: Stocke = {
-    v: 1,
-    t: Date.now(),
-    etape,
-    config: { ...config, marquages: config.marquages.map((m) => ({ ...m, logo: m.logo ? { nom: m.logo.nom, fichier: m.logo.fichier } : null })) },
-  };
-  await executer("readwrite", (s) => s.put(stocke, modeleId));
+  await ecrireBrouillon(modeleId, versStocke(config), etape);
 }
 
 export async function effacerBrouillon(modeleId: string) {
-  await executer("readwrite", (s) => s.delete(modeleId));
+  await executer(MAGASIN, "readwrite", (s) => s.delete(modeleId));
 }
 
 /** Relit le brouillon et le confronte au catalogue d'aujourd'hui (couleurs, tissus, emplacements) ; null s'il n'y en a pas ou s'il est périmé. */
 export async function lireBrouillon(modele: ModeleCatalogue): Promise<{ config: Configuration; etape: number } | null> {
-  const b = await executer<Stocke | undefined>("readonly", (s) => s.get(modele.id));
+  const b = await executer<Stocke | undefined>(MAGASIN, "readonly", (s) => s.get(modele.id));
   if (!b || b.v !== 1 || Date.now() - b.t > VALIDITE_MS) return null;
   const c = b.config;
   if (!modele.couleurs.some((x) => x.id === c.couleurId)) return null;
