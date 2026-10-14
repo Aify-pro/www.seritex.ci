@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Clock, Loader2, ShoppingBag, UserRound } from "lucide-react";
+import { Building2, Clock, FileText, Loader2, ShoppingBag, UserRound, Receipt } from "lucide-react";
 import { Identification } from "@/components/compte/identification";
 import { useCompte } from "@/components/compte/use-compte";
 import { CadreEspace } from "./cadre";
@@ -40,7 +40,7 @@ export function AccueilEspaceClient() {
           <p className="font-mono text-xs tracking-widest text-rouge uppercase">Espace client</p>
           <h1 className="mt-2 font-display text-4xl leading-[0.95] font-black tracking-tighter sm:text-5xl">Votre espace Seritex.</h1>
           <p className="mt-4 text-lg text-muted">
-            Retrouvez ici vos demandes de devis et, bientôt, vos devis, le suivi de vos commandes et vos livraisons. Un seul compte, aussi pour commander sur l&apos;e-shop.
+            Retrouvez ici vos demandes de devis, vos devis et, bientôt, le suivi de vos commandes et vos livraisons. Un seul compte, aussi pour commander sur l&apos;e-shop.
           </p>
         </div>
         <div className="border-2 border-ink bg-paper p-5 shadow-hard sm:p-8 lg:col-span-7">
@@ -75,6 +75,24 @@ export function AccueilEspaceClient() {
             <p className="text-sm text-muted">Choisissez, ajoutez votre logo, envoyez une demande de devis.</p>
           </Link>
         </li>
+        {profil.rattache && (
+          <>
+            <li>
+              <Link href="/espace-client/demandes" className={carte}>
+                <FileText aria-hidden className="text-rouge" />
+                <p className="mt-2 font-display text-xl font-black">Mes demandes</p>
+                <p className="text-sm text-muted">L&apos;avancement de vos demandes et vos échanges avec Seritex.</p>
+              </Link>
+            </li>
+            <li>
+              <Link href="/espace-client/devis" className={carte}>
+                <Receipt aria-hidden className="text-rouge" />
+                <p className="mt-2 font-display text-xl font-black">Mes devis</p>
+                <p className="text-sm text-muted">Vos devis, leurs lignes, leurs totaux et leurs conditions.</p>
+              </Link>
+            </li>
+          </>
+        )}
         <li>
           <Link href="/espace-client/compte" className={carte}>
             <UserRound aria-hidden className="text-rouge" />
@@ -83,7 +101,7 @@ export function AccueilEspaceClient() {
           </Link>
         </li>
       </ul>
-      <p className="mt-8 max-w-2xl text-sm text-muted">Vos demandes, vos devis, le suivi de vos commandes et vos livraisons arrivent dans cet espace très prochainement.</p>
+      <p className="mt-8 max-w-2xl text-sm text-muted">Le suivi de vos commandes et de vos livraisons arrive dans cet espace très prochainement.</p>
     </CadreEspace>
   );
 }
