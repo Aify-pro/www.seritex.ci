@@ -1,12 +1,14 @@
 /**
- * Envoi d'une composition « Personnaliser » à Seritex : schéma partagé
- * client + serveur. La base (create_site_personnalisation, migration 0110)
- * refait tous les contrôles métier ; ici on filtre la forme.
+ * Envoi d'une demande de l'e-shop à Seritex (un panier = une demande, avec un ou
+ * plusieurs articles) : schéma partagé client + serveur. La base
+ * (create_site_demande, migration 0126) refait tous les contrôles métier ;
+ * ici on filtre la forme.
  */
 
 export const BUCKET = "site-personnalisation";
 export const TAILLE_MAX = 15 * 1024 * 1024;
-export const FICHIERS_MAX = 9;
+export const FICHIERS_MAX = 60;
+export const ARTICLES_MAX = 10;
 export const TYPES_ACCEPTES = [
   "image/png",
   "image/jpeg",
@@ -19,7 +21,8 @@ export const TYPES_ACCEPTES = [
 ];
 
 export type FichierPrevu = { nom: string; type: string; taille: number };
-export type FichierDepose = { path: string; nom: string; role: "logo" | "maquette"; marquage?: number };
+/** `article` : rang de l'article dans la demande (à partir de 1) ; `marquage` : rang du marquage dans cet article. */
+export type FichierDepose = { path: string; nom: string; role: "logo" | "maquette"; marquage?: number; article?: number };
 
 export type MarquageEnvoye = {
   emplacement_id: string;
@@ -46,9 +49,8 @@ export type Coordonnees = {
   message: string;
 };
 
-export type EnvoiPersonnalisation = {
-  envoi_id: string;
-  coordonnees: Coordonnees;
+/** Un article du panier tel qu'il part à la plateforme (ses fichiers sont dans `fichiers` de la demande). */
+export type ArticleEnvoye = {
   modele_id: string;
   couleur_id: string | null;
   /** Couleur par zone (zone_key → couleur) ; null = couleur unique. */
@@ -57,6 +59,12 @@ export type EnvoiPersonnalisation = {
   quantite: number;
   repartition: Record<string, number> | null;
   marquages: MarquageEnvoye[];
+};
+
+export type DemandeEnvoyee = {
+  envoi_id: string;
+  coordonnees: Coordonnees;
+  articles: ArticleEnvoye[];
   fichiers: FichierDepose[];
 };
 
@@ -74,28 +82,16 @@ export function validerCoordonnees(c: Partial<Coordonnees>): ErreursCoordonnees 
   return e;
 }
 
-/** Nettoie et borne l'envoi reçu par le serveur du site ; null si la forme est invalide. */
-export function nettoyerEnvoi(raw: unknown): EnvoiPersonnalisation | null {
+const borne = (v: unknown, min: number, max: number) => Math.min(max, Math.max(min, Number(v) || 0));
+const uuid = (v: unknown) => (UUID.test(String(v ?? "")) ? String(v) : null);
+const txt = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+
+function nettoyerArticle(raw: unknown): ArticleEnvoye | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  const s = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
-  const c = (r.coordonnees ?? {}) as Record<string, unknown>;
-  const coordonnees: Coordonnees = {
-    nom: s(c.nom, 120),
-    entreprise: s(c.entreprise, 160),
-    email: s(c.email, 160).toLowerCase(),
-    telephone: s(c.telephone, 40),
-    date_souhaitee: s(c.date_souhaitee, 10),
-    message: s(c.message, 3000),
-  };
-  if (Object.keys(validerCoordonnees(coordonnees)).length) return null;
-  const envoi_id = s(r.envoi_id, 36);
-  const modele_id = s(r.modele_id, 36);
-  if (!UUID.test(envoi_id) || !UUID.test(modele_id)) return null;
-  const borne = (v: unknown, min: number, max: number) => Math.min(max, Math.max(min, Number(v) || 0));
-  const id = (v: unknown) => (UUID.test(String(v ?? "")) ? String(v) : null);
+  const modele_id = uuid(r.modele_id);
   const quantite = Math.floor(Number(r.quantite));
-  if (!Number.isFinite(quantite) || quantite < 1 || quantite > 1_000_000) return null;
+  if (!modele_id || !Number.isFinite(quantite) || quantite < 1 || quantite > 1_000_000) return null;
 
   const rep = r.repartition && typeof r.repartition === "object" ? (r.repartition as Record<string, unknown>) : null;
   const repartition = rep
@@ -109,19 +105,19 @@ export function nettoyerEnvoi(raw: unknown): EnvoiPersonnalisation | null {
 
   const marquages = (Array.isArray(r.marquages) ? r.marquages : []).slice(0, 8).flatMap((m): MarquageEnvoye[] => {
     const x = (m ?? {}) as Record<string, unknown>;
-    const emplacement_id = id(x.emplacement_id);
+    const emplacement_id = uuid(x.emplacement_id);
     if (!emplacement_id) return [];
     return [
       {
         emplacement_id,
-        emplacement_libelle: s(x.emplacement_libelle, 60),
+        emplacement_libelle: txt(x.emplacement_libelle, 60),
         largeur_cm: Math.min(60, Math.max(1, Number(x.largeur_cm) || 9)),
-        technique: s(x.technique, 40),
-        technique_libelle: s(x.technique_libelle, 60),
+        technique: txt(x.technique, 40),
+        technique_libelle: txt(x.technique_libelle, 60),
         nb_couleurs: Math.min(99, Math.max(0, Math.floor(Number(x.nb_couleurs) || 0))),
         degrade: !!x.degrade,
-        consigne: s(x.consigne, 600),
-        alertes: (Array.isArray(x.alertes) ? x.alertes : []).slice(0, 8).map((a) => s(a, 120)),
+        consigne: txt(x.consigne, 600),
+        alertes: (Array.isArray(x.alertes) ? x.alertes : []).slice(0, 8).map((a) => txt(a, 120)),
         decalage_x_cm: borne(x.decalage_x_cm, -40, 40),
         decalage_y_cm: borne(x.decalage_y_cm, -60, 60),
         rotation_deg: Math.round(borne(x.rotation_deg, -180, 180)),
@@ -129,40 +125,64 @@ export function nettoyerEnvoi(raw: unknown): EnvoiPersonnalisation | null {
     ];
   });
 
+  const z = r.couleurs_zones && typeof r.couleurs_zones === "object" ? (r.couleurs_zones as Record<string, unknown>) : null;
+  const zonesPropres = z
+    ? Object.entries(z)
+        .slice(0, 20)
+        .filter(([k, v]) => /^[\w-]{1,60}$/.test(k) && uuid(v))
+        .map(([k, v]) => [k, String(v)] as const)
+    : [];
+
+  return {
+    modele_id,
+    couleur_id: uuid(r.couleur_id),
+    couleurs_zones: zonesPropres.length ? Object.fromEntries(zonesPropres) : null,
+    textile_id: uuid(r.textile_id),
+    quantite,
+    repartition: repartition && Object.keys(repartition).length ? repartition : null,
+    marquages,
+  };
+}
+
+/** Nettoie et borne la demande reçue par le serveur du site ; null si la forme est invalide. */
+export function nettoyerDemande(raw: unknown): DemandeEnvoyee | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const c = (r.coordonnees ?? {}) as Record<string, unknown>;
+  const coordonnees: Coordonnees = {
+    nom: txt(c.nom, 120),
+    entreprise: txt(c.entreprise, 160),
+    email: txt(c.email, 160).toLowerCase(),
+    telephone: txt(c.telephone, 40),
+    date_souhaitee: txt(c.date_souhaitee, 10),
+    message: txt(c.message, 3000),
+  };
+  if (Object.keys(validerCoordonnees(coordonnees)).length) return null;
+  const envoi_id = txt(r.envoi_id, 36);
+  if (!UUID.test(envoi_id)) return null;
+
+  const brut = Array.isArray(r.articles) ? r.articles : [];
+  if (brut.length < 1 || brut.length > ARTICLES_MAX) return null;
+  const articles = brut.map(nettoyerArticle);
+  if (articles.some((a) => !a)) return null;
+
   const fichiers = (Array.isArray(r.fichiers) ? r.fichiers : []).slice(0, FICHIERS_MAX).flatMap((f): FichierDepose[] => {
     const x = (f ?? {}) as Record<string, unknown>;
-    const path = s(x.path, 300);
+    const path = txt(x.path, 300);
     if (!path.startsWith(`envois/${envoi_id}/`)) return [];
+    const article = Number(x.article);
     return [
       {
         path,
-        nom: s(x.nom, 200) || "fichier",
+        nom: txt(x.nom, 200) || "fichier",
         role: x.role === "maquette" ? "maquette" : "logo",
         ...(Number.isInteger(x.marquage) ? { marquage: Number(x.marquage) } : {}),
+        ...(Number.isInteger(article) && article >= 1 && article <= articles.length ? { article } : {}),
       },
     ];
   });
 
-  return {
-    envoi_id,
-    coordonnees,
-    modele_id,
-    couleur_id: id(r.couleur_id),
-    couleurs_zones: (() => {
-      const z = r.couleurs_zones && typeof r.couleurs_zones === "object" ? (r.couleurs_zones as Record<string, unknown>) : null;
-      if (!z) return null;
-      const propres = Object.entries(z)
-        .slice(0, 20)
-        .filter(([k, v]) => /^[\w-]{1,60}$/.test(k) && id(v))
-        .map(([k, v]) => [k, String(v)] as const);
-      return propres.length ? Object.fromEntries(propres) : null;
-    })(),
-    textile_id: id(r.textile_id),
-    quantite,
-    repartition: repartition && Object.keys(repartition).length ? repartition : null,
-    marquages,
-    fichiers,
-  };
+  return { envoi_id, coordonnees, articles: articles as ArticleEnvoye[], fichiers };
 }
 
 /** Nom de fichier sûr pour le stockage. */
