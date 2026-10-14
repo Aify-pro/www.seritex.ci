@@ -1,4 +1,5 @@
 import { BUCKET, FICHIERS_MAX, nomSur, TAILLE_MAX, TYPES_ACCEPTES, type FichierPrevu } from "@/lib/envoi-personnalisation";
+import { sessionCourante } from "@/lib/compte";
 import { getReglages, MESSAGE_FERMETURE } from "@/lib/reglages-site";
 
 /**
@@ -22,6 +23,10 @@ export async function POST(request: Request) {
   }
   // Champ piège : rempli par les robots seulement.
   if (body.site_web) return Response.json({ ok: false, message: "Requête invalide." }, { status: 400 });
+
+  if (!(await sessionCourante())) {
+    return Response.json({ ok: false, identification: true, message: "Identifiez-vous pour envoyer votre demande." }, { status: 401 });
+  }
 
   const fichiers = Array.isArray(body.fichiers) ? body.fichiers : [];
   if (fichiers.length === 0 || fichiers.length > FICHIERS_MAX) {
