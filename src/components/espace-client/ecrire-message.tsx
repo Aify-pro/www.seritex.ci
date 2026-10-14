@@ -6,8 +6,8 @@ import { Loader2, Send } from "lucide-react";
 const MAX = 4000;
 
 /** Écrire à Seritex dans le fil d'une demande. */
-export function EcrireMessage({ demandeId, apres }: { demandeId: string; apres: () => void }) {
-  const [texte, setTexte] = useState("");
+export function EcrireMessage({ demandeId, apres, texteInitial = "" }: { demandeId: string; apres: () => void; texteInitial?: string }) {
+  const [texte, setTexte] = useState(texteInitial);
   const [occupe, setOccupe] = useState(false);
   const [retour, setRetour] = useState<{ ok: boolean; message: string } | null>(null);
 
@@ -40,6 +40,7 @@ export function EcrireMessage({ demandeId, apres }: { demandeId: string; apres: 
       </label>
       <textarea
         id="nouveau-message"
+        autoFocus={texteInitial !== ""}
         value={texte}
         onChange={(e) => setTexte(e.target.value)}
         maxLength={MAX}
