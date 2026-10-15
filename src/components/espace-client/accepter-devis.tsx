@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { formatMontant, type DevisDetail } from "@/lib/espace-client-types";
@@ -54,7 +55,16 @@ export function AccepterDevis({ devis, apres }: { devis: DevisDetail; apres: () 
           {erreur}
         </p>
       )}
-      <p className="mt-3 text-sm text-muted">Une question avant de décider ? Écrivez-nous depuis la page de votre demande, ou à info@seritex.ci.</p>
+      <p className="mt-3 text-sm text-muted">
+        Une répartition par taille ou une quantité à ajuster ? Cela se fait <strong>avant</strong> l&apos;acceptation, à votre demande ou à celle de votre commercial.{" "}
+        {devis.demande ? (
+          <Link href={`/espace-client/demandes/${devis.demande.id}?ajuster=${encodeURIComponent(devis.reference)}#echanges`} className="font-bold underline">
+            Demander un ajustement
+          </Link>
+        ) : (
+          <>Écrivez-nous à info@seritex.ci.</>
+        )}
+      </p>
     </section>
   );
 }

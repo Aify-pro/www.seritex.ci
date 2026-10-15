@@ -9,7 +9,7 @@ import { useDonnees } from "./use-donnees";
 
 const bloc = "border-2 border-ink bg-paper p-5 shadow-hard-sm";
 
-function Detail({ id }: { id: string }) {
+function Detail({ id, messageInitial }: { id: string; messageInitial: string }) {
   const r = useDonnees<{ demande: DemandeDetail }>(`/api/espace-client/demandes/${id}`);
   if (r.statut === "charge") return <Chargement />;
   if (r.statut === "introuvable") return <Message>Cette demande est introuvable.</Message>;
@@ -92,13 +92,13 @@ function Detail({ id }: { id: string }) {
             ))}
           </ul>
         )}
-        <EcrireMessage demandeId={d.id} apres={r.recharger} />
+        <EcrireMessage demandeId={d.id} apres={r.recharger} texteInitial={messageInitial} />
       </section>
     </div>
   );
 }
 
-export function PageDemande({ id }: { id: string }) {
+export function PageDemande({ id, messageInitial = "" }: { id: string; messageInitial?: string }) {
   return (
     <Ecran titre="Ma demande" retour={`/espace-client/demandes/${id}`}>
       {() => (
@@ -106,7 +106,7 @@ export function PageDemande({ id }: { id: string }) {
           <Link href="/espace-client/demandes" className="inline-flex items-center gap-1 font-display text-sm font-bold underline">
             <ArrowLeft aria-hidden size={14} /> Toutes mes demandes
           </Link>
-          <Detail id={id} />
+          <Detail id={id} messageInitial={messageInitial} />
         </div>
       )}
     </Ecran>
