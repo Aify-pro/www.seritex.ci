@@ -105,3 +105,75 @@ export function formatMontant(v: number | null | undefined, devise = "XOF"): str
 
 export const formatDateFr = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", timeZone: "Africa/Abidjan" }) : "—";
+
+/** États simplifiés des commandes (vue client_commandes de la plateforme) : jamais les étapes internes. */
+export const ETAT_COMMANDE: Record<string, string> = {
+  en_preparation: "En préparation",
+  en_fabrication: "En fabrication",
+  terminee: "Terminée",
+  annulee: "Annulée",
+};
+
+export const ETAT_LIVRAISON: Record<string, string> = {
+  en_preparation: "En préparation",
+  planifiee: "Planifiée",
+  prete_a_enlever: "Prête à enlever",
+  en_route: "En route",
+  livree: "Livrée",
+  enlevee: "Enlevée",
+  reception_confirmee: "Réception confirmée",
+  a_replanifier: "À replanifier",
+  litige: "Litige en cours",
+};
+
+export const STATUT_ECHANTILLON: Record<string, string> = {
+  demande: "Demandé",
+  en_fabrication: "En fabrication",
+  envoye: "Envoyé",
+  recu_client: "Reçu",
+  en_validation: "En validation",
+  valide: "Validé",
+  a_ajuster: "À ajuster",
+  refuse: "Refusé",
+  sans_suite: "Sans suite",
+};
+
+export type CommandeListe = {
+  id: string;
+  reference: string;
+  etat: string;
+  quantite: number;
+  prevue: string | null;
+  date: string;
+  section: string | null;
+  devis_reference: string | null;
+  demande_id: string | null;
+};
+
+export type LivraisonListe = {
+  id: string;
+  reference: string | null;
+  etat: string;
+  mode: "livraison" | "retrait";
+  lieu: string | null;
+  commande: string | null;
+  quantite: number;
+  /** Date la plus parlante : livraison effective, sinon planifiée, sinon promise. */
+  date: string | null;
+};
+
+export type LivraisonDetail = LivraisonListe & {
+  lignes: { designation: string; taille: string | null; quantite: number; livree: number | null }[];
+  suivi: { etat: string; date: string }[];
+};
+
+export type EchantillonListe = {
+  id: string;
+  reference: string;
+  numero: string | null;
+  besoin: string;
+  statut: string;
+  echeance: string | null;
+  date: string;
+  demande: { id: string; reference: string } | null;
+};

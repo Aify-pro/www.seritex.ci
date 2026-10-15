@@ -9,6 +9,9 @@ const LIENS = [
   { href: "/espace-client", label: "Mon espace" },
   { href: "/espace-client/demandes", label: "Mes demandes" },
   { href: "/espace-client/devis", label: "Mes devis" },
+  { href: "/espace-client/commandes", label: "Mes commandes" },
+  { href: "/espace-client/livraisons", label: "Mes livraisons" },
+  { href: "/espace-client/echantillons", label: "Mes échantillons" },
   { href: "/espace-client/compte", label: "Mon compte" },
 ] as const;
 
