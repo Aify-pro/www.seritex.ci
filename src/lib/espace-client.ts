@@ -1,6 +1,6 @@
 import type { Profil } from "@/lib/compte";
 import { sessionAvecJeton } from "@/lib/compte";
-import type { ArticleResume, DemandeDetail, DemandeListe, DevisDetail, DevisResume, Echange, LigneDevis } from "./espace-client-types";
+import type { ArticleResume, CommandeListe, DemandeDetail, DemandeListe, DevisDetail, DevisResume, Echange, EchantillonListe, LigneDevis, LivraisonDetail, LivraisonListe } from "./espace-client-types";
 import { libelleDelai } from "./espace-client-types";
 
 /**
@@ -206,4 +206,72 @@ export async function ecrireMessage(jeton: string, profilId: string, demandeId: 
   const r = await ecrire(jeton, "messages", { request_id: demandeId, sender_id: profilId, body: t });
   if (r.ok) return r;
   return { ok: false, code: "erreur", message: "Votre message n'a pas pu être envoyé. Réessayez." };
+}
+
+// ---------------------------------------------------------------------------
+// Suivi : commandes, livraisons (vues client_* de la plateforme, migration 0132) et échantillons.
+// Les vues ne montrent que l'état simplifié — ni coût, ni note interne, ni livreur, ni GPS.
+// ---------------------------------------------------------------------------
+
+type LigneCommande = {
+  id: string; reference: string; etat: string; total_quantity: number; planned_end_date: string | null; created_at: string;
+  section_en_cours: string | null; devis_reference: string | null; demande_id: string | null;
+};
+
+export async function listerCommandes(jeton: string): Promise<CommandeListe[] | null> {
+  const r = await lire<LigneCommande[]>(jeton, "client_commandes?select=id,reference,etat,total_quantity,planned_end_date,created_at,section_en_cours,devis_reference,demande_id&order=created_at.desc&limit=200");
+  return r
+    ? r.map((c) => ({
+        id: c.id, reference: c.reference, etat: c.etat, quantite: Number(c.total_quantity) || 0, prevue: c.planned_end_date, date: c.created_at,
+        // La section n'a de sens que pendant la fabrication.
+        section: c.etat === "en_fabrication" ? c.section_en_cours : null, devis_reference: c.devis_reference, demande_id: c.demande_id,
+      }))
+    : null;
+}
+
+type LigneLivraison = {
+  id: string; reference: string | null; etat: string; mode: "livraison" | "retrait"; lieu_libelle: string | null; commande_reference: string | null;
+  quantite: number; date_promise: string | null; date_planifiee: string | null; livree_at: string | null;
+};
+const COLONNES_LIVRAISON = "id,reference,etat,mode,lieu_libelle,commande_reference,quantite,date_promise,date_planifiee,livree_at";
+const versLivraison = (l: LigneLivraison): LivraisonListe => ({
+  id: l.id, reference: l.reference, etat: l.etat, mode: l.mode, lieu: l.mode === "retrait" ? null : l.lieu_libelle, commande: l.commande_reference,
+  quantite: Number(l.quantite) || 0, date: l.livree_at ?? l.date_planifiee ?? l.date_promise,
+});
+
+export async function listerLivraisons(jeton: string): Promise<LivraisonListe[] | null> {
+  const r = await lire<LigneLivraison[]>(jeton, `client_livraisons?select=${COLONNES_LIVRAISON}&order=created_at.desc&limit=200`);
+  return r ? r.map(versLivraison) : null;
+}
+
+export async function detailLivraison(jeton: string, id: string): Promise<LivraisonDetail | null> {
+  const l = (await lire<LigneLivraison[]>(jeton, `client_livraisons?id=eq.${id}&select=${COLONNES_LIVRAISON}`))?.[0];
+  if (!l) return null;
+  const [lignes, suivi] = await Promise.all([
+    lire<{ designation: string; taille: string | null; quantite: number; quantite_livree: number | null }[]>(jeton, `client_livraison_lignes?shipment_id=eq.${id}&select=designation,taille,quantite,quantite_livree&order=designation,taille_ordre`),
+    lire<{ etat: string; occurred_at: string }[]>(jeton, `client_livraison_suivi?shipment_id=eq.${id}&select=etat,occurred_at&order=occurred_at.asc`),
+  ]);
+  // Une même étape visible deux fois de suite (ex. plusieurs étapes internes = « en préparation ») ne compte qu'une fois.
+  const etapes: { etat: string; date: string }[] = [];
+  for (const e of suivi ?? []) if (etapes[etapes.length - 1]?.etat !== e.etat) etapes.push({ etat: e.etat, date: e.occurred_at });
+  return {
+    ...versLivraison(l),
+    lignes: (lignes ?? []).map((x) => ({ designation: x.designation, taille: x.taille, quantite: x.quantite, livree: x.quantite_livree })),
+    suivi: etapes,
+  };
+}
+
+type LigneEchantillon = { id: string; reference: string; sample_number: string | null; need_description: string; status: string; due_date: string | null; created_at: string; request_id: string | null };
+
+export async function listerEchantillons(jeton: string): Promise<EchantillonListe[] | null> {
+  // Colonnes nommées : jamais les commentaires de la direction ni les notes.
+  const r = await lire<LigneEchantillon[]>(jeton, "sample_requests?select=id,reference,sample_number,need_description,status,due_date,created_at,request_id&order=created_at.desc&limit=200");
+  if (!r) return null;
+  const ids = [...new Set(r.map((e) => e.request_id).filter((v): v is string => !!v))];
+  const demandes = ids.length ? await lire<{ id: string; reference: string }[]>(jeton, `requests?id=in.(${ids.join(",")})&select=id,reference`) : [];
+  const refDe = new Map((demandes ?? []).map((d) => [d.id, d.reference]));
+  return r.map((e) => ({
+    id: e.id, reference: e.reference, numero: e.sample_number, besoin: e.need_description, statut: e.status, echeance: e.due_date, date: e.created_at,
+    demande: e.request_id && refDe.has(e.request_id) ? { id: e.request_id, reference: refDe.get(e.request_id)! } : null,
+  }));
 }
