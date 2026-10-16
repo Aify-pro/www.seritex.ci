@@ -21,8 +21,8 @@ export const TYPES_ACCEPTES = [
 ];
 
 export type FichierPrevu = { nom: string; type: string; taille: number };
-/** `article` : rang de l'article dans la demande (à partir de 1) ; `marquage` : rang du marquage dans cet article. */
-export type FichierDepose = { path: string; nom: string; role: "logo" | "maquette"; marquage?: number; article?: number };
+/** `article` : rang de l'article dans la demande (à partir de 1) ; `marquage` : rang du marquage dans cet article. `apercu` = image (PNG) de la maquette, en plus du PDF. */
+export type FichierDepose = { path: string; nom: string; role: "logo" | "maquette" | "apercu"; marquage?: number; article?: number };
 
 export type MarquageEnvoye = {
   emplacement_id: string;
@@ -175,7 +175,7 @@ export function nettoyerDemande(raw: unknown): DemandeEnvoyee | null {
       {
         path,
         nom: txt(x.nom, 200) || "fichier",
-        role: x.role === "maquette" ? "maquette" : "logo",
+        role: x.role === "maquette" ? "maquette" : x.role === "apercu" ? "apercu" : "logo",
         ...(Number.isInteger(x.marquage) ? { marquage: Number(x.marquage) } : {}),
         ...(Number.isInteger(article) && article >= 1 && article <= articles.length ? { article } : {}),
       },

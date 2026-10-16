@@ -5,7 +5,7 @@ import { CATEGORIE_FICHIER, formatDateFr, formatTaille, TAILLE_MAX_TELECHARGEMEN
 import { Chargement, Ecran, Message } from "./ecran";
 import { useDonnees } from "./use-donnees";
 
-const ORDRE = ["visuel", "image_de_marque", "fiche_technique", "nuancier", "autre"];
+const ORDRE = ["visuel", "maquette", "image_de_marque", "fiche_technique", "nuancier", "autre"];
 
 function Liste() {
   const r = useDonnees<{ fichiers: FichierListe[] }>("/api/espace-client/mediatheque");
