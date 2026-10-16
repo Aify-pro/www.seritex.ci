@@ -177,3 +177,25 @@ export type EchantillonListe = {
   date: string;
   demande: { id: string; reference: string } | null;
 };
+
+export const CATEGORIE_FICHIER: Record<string, string> = {
+  visuel: "Visuels",
+  image_de_marque: "Image de marque",
+  fiche_technique: "Fiches techniques",
+  nuancier: "Nuanciers",
+  autre: "Autres fichiers",
+};
+
+export type FichierListe = { id: string; nom: string; categorie: string; type: string | null; taille: number | null; date: string };
+
+/** 1,2 Mo, 340 Ko… */
+export function formatTaille(octets: number | null | undefined): string {
+  if (octets == null || octets < 0) return "";
+  if (octets < 1024) return `${octets} o`;
+  if (octets < 1024 * 1024) return `${Math.round(octets / 1024)} Ko`;
+  return `${(octets / 1024 / 1024).toFixed(1).replace(".", ",")} Mo`;
+}
+
+/** Au-delà, le site ne relaie pas le fichier (réponses limitées à 4,5 Mo) : le client le demande à son conseiller. */
+export const TAILLE_MAX_TELECHARGEMENT = 4_000_000;
+

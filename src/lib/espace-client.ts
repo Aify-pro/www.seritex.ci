@@ -1,6 +1,6 @@
 import type { Profil } from "@/lib/compte";
 import { sessionAvecJeton } from "@/lib/compte";
-import type { ArticleResume, CommandeListe, DemandeDetail, DemandeListe, DevisDetail, DevisResume, Echange, EchantillonListe, LigneDevis, LivraisonDetail, LivraisonListe } from "./espace-client-types";
+import type { ArticleResume, CommandeListe, FichierListe, DemandeDetail, DemandeListe, DevisDetail, DevisResume, Echange, EchantillonListe, LigneDevis, LivraisonDetail, LivraisonListe } from "./espace-client-types";
 import { libelleDelai } from "./espace-client-types";
 
 /**
@@ -275,3 +275,16 @@ export async function listerEchantillons(jeton: string): Promise<EchantillonList
     demande: e.request_id && refDe.has(e.request_id) ? { id: e.request_id, reference: refDe.get(e.request_id)! } : null,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Médiathèque : liste (lecture avec la session du client) ; le téléchargement passe par la
+// plateforme (route /api/site/media/[id]), seule à détenir les identifiants du NAS.
+// ---------------------------------------------------------------------------
+
+export async function listerFichiers(jeton: string): Promise<FichierListe[] | null> {
+  // Colonnes nommées : ni journal interne, ni chemins de stockage.
+  const r = await lire<{ id: string; file_name: string; category: string; mime_type: string | null; size_bytes: number | null; created_at: string }[]>(
+    jeton, "media_files?select=id,file_name,category,mime_type,size_bytes,created_at&order=created_at.desc&limit=500");
+  return r ? r.map((f) => ({ id: f.id, nom: f.file_name, categorie: f.category, type: f.mime_type, taille: f.size_bytes == null ? null : Number(f.size_bytes), date: f.created_at })) : null;
+}
+

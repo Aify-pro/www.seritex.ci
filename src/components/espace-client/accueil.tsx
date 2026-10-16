@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Clock, FileText, Loader2, Package, Receipt, Shirt, ShoppingBag, Truck, UserRound } from "lucide-react";
+import { Building2, Clock, FileText, FolderOpen, Loader2, Package, Receipt, Shirt, ShoppingBag, Truck, UserRound } from "lucide-react";
 import { Identification } from "@/components/compte/identification";
 import { useCompte } from "@/components/compte/use-compte";
 import { CadreEspace } from "./cadre";
@@ -110,6 +110,13 @@ export function AccueilEspaceClient() {
                 <Shirt aria-hidden className="text-rouge" />
                 <p className="mt-2 font-display text-xl font-black">Mes échantillons</p>
                 <p className="text-sm text-muted">Les échantillons préparés pour vous avant une commande.</p>
+              </Link>
+            </li>
+            <li>
+              <Link href="/espace-client/mediatheque" className={carte}>
+                <FolderOpen aria-hidden className="text-rouge" />
+                <p className="mt-2 font-display text-xl font-black">Ma médiathèque</p>
+                <p className="text-sm text-muted">Vos visuels, votre image de marque et vos fiches techniques.</p>
               </Link>
             </li>
           </>
