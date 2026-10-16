@@ -90,11 +90,13 @@ export function PagePanier() {
       return;
     }
 
-    // Tous les fichiers de la demande : logos et maquette PDF de chaque article.
-    const aEnvoyer: { fichier: File; role: "logo" | "maquette"; marquage?: number; article: number }[] = [];
+    // Tous les fichiers de la demande : logos, maquette PDF et image de la maquette de chaque article.
+    const aEnvoyer: { fichier: File; role: "logo" | "maquette" | "apercu"; marquage?: number; article: number }[] = [];
     articles.forEach((a, i) => {
       for (const l of a.logos) aEnvoyer.push({ fichier: l.fichier, role: "logo", marquage: l.marquage, article: i + 1 });
       aEnvoyer.push({ fichier: new File([a.maquette], `maquette-article-${i + 1}.pdf`, { type: "application/pdf" }), role: "maquette", article: i + 1 });
+      // Paniers anciens ou rendu impossible : pas d'image, le PDF suffit.
+      if (a.apercu) aEnvoyer.push({ fichier: new File([a.apercu], `maquette-article-${i + 1}.png`, { type: "image/png" }), role: "apercu", article: i + 1 });
     });
     if (aEnvoyer.length > FICHIERS_MAX) {
       return setEtat({ kind: "erreur", message: "Votre panier contient trop de fichiers : envoyez cette demande, puis créez-en une seconde pour le reste." });

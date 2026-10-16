@@ -180,6 +180,7 @@ export type EchantillonListe = {
 
 export const CATEGORIE_FICHIER: Record<string, string> = {
   visuel: "Visuels",
+  maquette: "Maquettes",
   image_de_marque: "Image de marque",
   fiche_technique: "Fiches techniques",
   nuancier: "Nuanciers",
