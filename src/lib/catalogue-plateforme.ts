@@ -27,8 +27,11 @@ export type MockupCatalogue = {
   zones: Record<string, string>;
   largeurCm: number;
   cadre: { x: number; y: number; w: number; h: number };
-  /** id de zone d'impression → position dans le SVG. */
-  reperes: Record<string, { x: number; y: number }>;
+  /**
+   * id de zone d'impression → position dans le SVG, et zones de couleur où le visuel peut passer
+   * (hors de ces zones il est découpé ; absent = tout le vêtement).
+   */
+  reperes: Record<string, { x: number; y: number; zones?: string[] }>;
 };
 
 export type ModeleCatalogue = {

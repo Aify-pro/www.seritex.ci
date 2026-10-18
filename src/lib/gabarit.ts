@@ -46,6 +46,7 @@ export function placementDe(modele: ModeleCatalogue, emplacementId: string): Pla
     y: r.y,
     echelle: mk.cadre.w / mk.largeurCm,
     cadre: [mk.cadre.x, mk.cadre.y, mk.cadre.x + mk.cadre.w, mk.cadre.y + mk.cadre.h],
+    zones: zone ? mk.reperes[zone.id]?.zones : undefined,
   };
 }
 

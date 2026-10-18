@@ -198,12 +198,34 @@ export const Apercu = forwardRef<
   const echap = (id: string) => id.replace(/["\\]/g, "\\$&");
   const relies = mockup ? Object.keys(mockup.zones) : [];
   const nommes = mockup ? [...mockup.svg.matchAll(/\sid="([^"]+)"/g)].map((x) => x[1]) : [];
+  // Découpe par zone de pose : un visuel ne dépasse pas les zones de couleur de son emplacement
+  // (le « groupe » : les zones cochées dans la fiche article se traversent, le reste coupe).
+  // Sans zones définies (ancien réglage), il est coupé à tout le vêtement. Un masque par groupe distinct.
+  const zonesDuMockup = mockup ? new Set(Object.values(mockup.zones)) : new Set<string>();
+  const groupeDe = (m: MarquageApercu) => {
+    const cles = (m.placement.zones ?? []).filter((z) => zonesDuMockup.has(z) && z !== "__contour");
+    return mockup && cles.length > 0 ? [...new Set(cles)].sort().join("|") : "";
+  };
+  const groupes = [...new Set(visibles.map(groupeDe))];
+  const ids = (g: string) => `${pk}${groupes.indexOf(g)}`;
+  const styleMasques = mockup
+    ? groupes
+        .flatMap((g) => {
+          const autorises = g === "" ? relies : relies.filter((id) => g.split("|").includes(mockup.zones[id]));
+          return [
+            `[id="${gid}-masque${groupes.indexOf(g)}"] * { fill: #fff !important; stroke: #fff !important; }`,
+            ...nommes
+              .filter((id) => !autorises.includes(id) && !/^(defs|style)/i.test(id))
+              .map((id) => `[id="${ids(g)}-${echap(id)}"] { display: none !important; }`),
+          ];
+        })
+        .join("\n")
+    : "";
   const styleMockup = mockup
     ? [
         ...Object.entries(mockup.zones)
           .filter(([, zk]) => zk !== "__contour" && couleursZones[zk])
           .map(([id, zk]) => `[id="${pm}-${echap(id)}"], [id="${pm}-${echap(id)}"] * { fill: ${couleursZones[zk]} !important; }`),
-        `[id="${gid}-masque"] * { fill: #fff !important; stroke: #fff !important; }`,
         // Zones cliquables, et zone dont la palette est ouverte surlignée.
         ...(onChoisirZone
           ? Object.entries(mockup.zones)
@@ -216,9 +238,6 @@ export const Apercu = forwardRef<
             ([id]) =>
               `[id="${pm}-${echap(id)}"], [id="${pm}-${echap(id)}"] * { stroke: #f28c1b !important; stroke-width: ${(4 * k).toFixed(2)}px !important; stroke-dasharray: ${(8 * k).toFixed(2)} ${(5 * k).toFixed(2)}; }`,
           ),
-        ...nommes
-          .filter((id) => !relies.includes(id) && !/^(defs|style)/i.test(id))
-          .map((id) => `[id="${pk}-${echap(id)}"] { display: none !important; }`),
       ].join("\n")
     : "";
 
@@ -238,12 +257,14 @@ export const Apercu = forwardRef<
     >
       {mockup ? (
         <>
-          <style>{styleMockup}</style>
+          <style>{styleMockup + "\n" + styleMasques}</style>
           <defs>
-            {/* Masque : le vêtement en blanc ; ce qui dépasse n'est pas imprimé. */}
-            <mask id={`${gid}-vetement-masque`} maskUnits="userSpaceOnUse" x={vb[0]} y={vb[1]} width={vb[2]} height={vb[3]}>
-              <g id={`${gid}-masque`} dangerouslySetInnerHTML={{ __html: caler(scoperSvg(mockup.svg, pk)) }} />
-            </mask>
+            {/* Masques : les zones autorisées en blanc ; ce qui dépasse n'est pas imprimé. */}
+            {groupes.map((g, i) => (
+              <mask key={g || "tout"} id={`${gid}-vetement-masque${i}`} maskUnits="userSpaceOnUse" x={vb[0]} y={vb[1]} width={vb[2]} height={vb[3]}>
+                <g id={`${gid}-masque${i}`} dangerouslySetInnerHTML={{ __html: caler(scoperSvg(mockup.svg, ids(g))) }} />
+              </mask>
+            ))}
           </defs>
           <g
             dangerouslySetInnerHTML={{ __html: caler(scoperSvg(mockup.svg, pm)) }}
@@ -298,25 +319,25 @@ export const Apercu = forwardRef<
         </>
       )}
 
-      {/* Calque 1 : les visuels, découpés au vêtement, dans l'ordre des calques. */}
-      <g {...(mockup ? { mask: `url(#${gid}-vetement-masque)` } : { clipPath: `url(#${gid}-vetement)` })}>
-        {visibles.map((m) => {
-          const u = echelleDe(m.placement);
-          const w = m.largeurCm * u;
-          const h = w * m.ratio;
-          const cx = m.placement.x + m.dxCm * u;
-          const cy = m.placement.y + m.dyCm * u;
-          return (
-            <g key={m.id} transform={`translate(${cx} ${cy}) rotate(${m.rotation})`} pointerEvents="none">
+      {/* Calque 1 : les visuels, découpés à la zone de leur emplacement (ou au vêtement), dans l'ordre des calques. */}
+      {visibles.map((m) => {
+        const u = echelleDe(m.placement);
+        const w = m.largeurCm * u;
+        const h = w * m.ratio;
+        const cx = m.placement.x + m.dxCm * u;
+        const cy = m.placement.y + m.dyCm * u;
+        return (
+          <g key={m.id} {...(mockup ? { mask: `url(#${gid}-vetement-masque${groupes.indexOf(groupeDe(m))})` } : { clipPath: `url(#${gid}-vetement)` })}>
+            <g transform={`translate(${cx} ${cy}) rotate(${m.rotation})`} pointerEvents="none">
               {m.apercuUrl ? (
                 <image href={m.apercuUrl} x={-w / 2} y={-h / 2} width={w} height={h} preserveAspectRatio="xMidYMid meet" />
               ) : (
                 <rect x={-w / 2} y={-h / 2} width={w} height={h} fill="rgb(255 255 255 / 0.35)" stroke="#15163a" strokeDasharray="3 3" />
               )}
             </g>
-          );
-        })}
-      </g>
+          </g>
+        );
+      })}
 
       {/* Calque 2 : zones de prise, cadres, poignées et cotes (non découpés, pour rattraper un visuel sorti du vêtement). */}
       {visibles.map((m) => {
