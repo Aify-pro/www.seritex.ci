@@ -97,6 +97,8 @@ export type Placement = {
   echelle?: number;
   /** Mockup : cadre du vêtement [x0, y0, x1, y1] dans le SVG (sinon la silhouette standard). */
   cadre?: [number, number, number, number];
+  /** Mockup : zones de couleur sur lesquelles le visuel peut passer (le reste le coupe) ; absent = tout le vêtement. */
+  zones?: string[];
 };
 
 /** Unités du dessin par centimètre de vêtement, pour ce placement. */
