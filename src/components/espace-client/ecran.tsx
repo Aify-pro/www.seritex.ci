@@ -5,6 +5,7 @@ import { Clock, Loader2 } from "lucide-react";
 import { Identification } from "@/components/compte/identification";
 import { useCompte } from "@/components/compte/use-compte";
 import type { Profil } from "@/lib/compte";
+import { MESSAGE_INTERDIT } from "@/lib/droits";
 import { CadreEspace } from "./cadre";
 
 export function Chargement() {
@@ -13,6 +14,11 @@ export function Chargement() {
       <Loader2 aria-hidden className="mr-2 inline animate-spin" size={16} /> Chargement…
     </p>
   );
+}
+
+/** Droit retiré par Seritex pour ce compte (403 des routes /api/espace-client). */
+export function Interdit() {
+  return <Message>{MESSAGE_INTERDIT}</Message>;
 }
 
 export function Message({ children, alerte = false }: { children: React.ReactNode; alerte?: boolean }) {

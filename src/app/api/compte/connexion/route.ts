@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, message: "E-mail ou mot de passe incorrect." }, { status: 401 });
   }
 
-  const profil = await profilDe(r.data.user);
+  const profil = await profilDe(r.data.user, r.data.access_token);
   if (!profil) return Response.json({ ok: false, message: "Ce compte n'a pas pu être ouvert. Écrivez-nous à info@seritex.ci." }, { status: 403 });
   await poserSession(r.data);
   return Response.json({ ok: true, profil });

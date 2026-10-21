@@ -1,5 +1,6 @@
 import type { Profil } from "@/lib/compte";
 import { sessionAvecJeton } from "@/lib/compte";
+import { autorise, type Droit } from "@/lib/droits";
 import type { ArticleResume, CommandeListe, FichierListe, DemandeDetail, DemandeListe, DevisDetail, DevisResume, Echange, EchantillonListe, LigneDevis, LivraisonDetail, LivraisonListe } from "./espace-client-types";
 import { libelleDelai } from "./espace-client-types";
 
@@ -35,6 +36,10 @@ export async function sessionClient(): Promise<{ profil: Profil; jeton: string }
   return s;
 }
 export const nonRattache = () => Response.json({ connecte: true, rattache: false });
+/** Droit retiré par Seritex (société ou compte) : 403 explicite, plutôt qu'une liste vide ressemblant à « rien pour le moment ». */
+export function refuser(s: { profil: Profil }, droit: Droit): Response | null {
+  return autorise(s.profil.droits, droit) ? null : Response.json({ connecte: true, rattache: true, interdit: true }, { status: 403 });
+}
 
 type LigneDemande = { id: string; reference: string; status: string; description: string | null; created_at: string; personnalisation: unknown };
 

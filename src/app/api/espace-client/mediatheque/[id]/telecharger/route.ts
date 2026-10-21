@@ -1,5 +1,5 @@
 import { site } from "@/content/site";
-import { idValide, nonRattache, sessionClient } from "@/lib/espace-client";
+import { idValide, nonRattache, refuser, sessionClient } from "@/lib/espace-client";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const s = await sessionClient();
   if (s instanceof Response) return s;
   if (!s.profil.rattache) return nonRattache();
+  const interdit = refuser(s, "mediatheque_voir");
+  if (interdit) return interdit;
   if (!idValide(id)) return Response.json({ introuvable: true }, { status: 404 });
 
   let res: Response;

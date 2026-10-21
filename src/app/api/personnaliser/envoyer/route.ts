@@ -1,5 +1,6 @@
 import { nettoyerDemande } from "@/lib/envoi-personnalisation";
 import { sessionCourante } from "@/lib/compte";
+import { autorise, MESSAGE_INTERDIT } from "@/lib/droits";
 import { getReglages, MESSAGE_FERMETURE } from "@/lib/reglages-site";
 
 /**
@@ -24,6 +25,8 @@ export async function POST(request: Request) {
   // (c'est lui qui rattache la demande à la bonne fiche client).
   const profil = await sessionCourante();
   if (!profil) return Response.json({ ok: false, identification: true, message: "Identifiez-vous pour envoyer votre demande." }, { status: 401 });
+  // L'envoi passe par la clé de service (la RLS ne s'applique pas ici) : le droit « créer une demande » est donc contrôlé ICI.
+  if (!autorise(profil.droits, "demandes_creer")) return Response.json({ ok: false, message: MESSAGE_INTERDIT }, { status: 403 });
   if (raw && typeof raw === "object") {
     const r = raw as { coordonnees?: Record<string, unknown> };
     r.coordonnees = { ...(r.coordonnees ?? {}), email: profil.email };
