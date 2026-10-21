@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Building2, Clock, FileText, FolderOpen, Loader2, Package, Receipt, Shirt, ShoppingBag, Truck, UserRound } from "lucide-react";
 import { Identification } from "@/components/compte/identification";
 import { useCompte } from "@/components/compte/use-compte";
+import { autorise, type Droit } from "@/lib/droits";
 import { CadreEspace } from "./cadre";
 
 const carte = "block border-2 border-ink bg-paper p-5 shadow-hard-sm transition hover:-translate-y-0.5";
@@ -50,6 +51,7 @@ export function AccueilEspaceClient() {
     );
   }
 
+  const ok = (d: Droit) => autorise(profil.droits, d);
   return (
     <CadreEspace profil={profil} titre={`Bonjour ${profil.nom.split(" ")[0]}.`} deconnecter={() => void compte.deconnecter()}>
       {!profil.rattache ? (
@@ -84,6 +86,7 @@ export function AccueilEspaceClient() {
                 <p className="text-sm text-muted">L&apos;avancement de vos demandes et vos échanges avec Seritex.</p>
               </Link>
             </li>
+            {ok("devis_voir") && (
             <li>
               <Link href="/espace-client/devis" className={carte}>
                 <Receipt aria-hidden className="text-rouge" />
@@ -91,6 +94,8 @@ export function AccueilEspaceClient() {
                 <p className="text-sm text-muted">Vos devis, leurs lignes, leurs totaux et leurs conditions.</p>
               </Link>
             </li>
+            )}
+            {ok("commandes_voir") && (
             <li>
               <Link href="/espace-client/commandes" className={carte}>
                 <Package aria-hidden className="text-rouge" />
@@ -98,6 +103,8 @@ export function AccueilEspaceClient() {
                 <p className="text-sm text-muted">L&apos;avancement de la fabrication de vos commandes.</p>
               </Link>
             </li>
+            )}
+            {ok("livraisons_voir") && (
             <li>
               <Link href="/espace-client/livraisons" className={carte}>
                 <Truck aria-hidden className="text-rouge" />
@@ -105,6 +112,8 @@ export function AccueilEspaceClient() {
                 <p className="text-sm text-muted">Où en est chaque livraison, et ce qu&apos;elle contient.</p>
               </Link>
             </li>
+            )}
+            {ok("echantillons_voir") && (
             <li>
               <Link href="/espace-client/echantillons" className={carte}>
                 <Shirt aria-hidden className="text-rouge" />
@@ -112,6 +121,8 @@ export function AccueilEspaceClient() {
                 <p className="text-sm text-muted">Les échantillons préparés pour vous avant une commande.</p>
               </Link>
             </li>
+            )}
+            {ok("mediatheque_voir") && (
             <li>
               <Link href="/espace-client/mediatheque" className={carte}>
                 <FolderOpen aria-hidden className="text-rouge" />
@@ -119,6 +130,7 @@ export function AccueilEspaceClient() {
                 <p className="text-sm text-muted">Vos visuels, votre image de marque et vos fiches techniques.</p>
               </Link>
             </li>
+            )}
           </>
         )}
         <li>

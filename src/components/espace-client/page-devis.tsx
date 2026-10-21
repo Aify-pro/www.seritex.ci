@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { formatDateFr, formatMontant, STATUT_DEVIS, type DevisDetail } from "@/lib/espace-client-types";
-import { Chargement, Ecran, Message, Pastille } from "./ecran";
+import { Chargement, Ecran, Message, Pastille, Interdit } from "./ecran";
 import { AccepterDevis } from "./accepter-devis";
 import { useDonnees } from "./use-donnees";
 
@@ -14,6 +14,7 @@ function Detail({ id }: { id: string }) {
   if (r.statut === "charge") return <Chargement />;
   if (r.statut === "introuvable") return <Message>Ce devis est introuvable.</Message>;
   if (r.statut === "deconnecte") return <Message alerte>Votre session a expiré. Rechargez la page pour vous reconnecter.</Message>;
+  if (r.statut === "interdit") return <Interdit />;
   if (!r.donnees) return <Message alerte>Impossible de charger ce devis pour le moment.</Message>;
   const q = r.donnees.devis;
   const m = (v: number | null) => formatMontant(v, q.devise);
@@ -78,6 +79,11 @@ function Detail({ id }: { id: string }) {
       </section>
 
       {q.peut_accepter && <AccepterDevis devis={q} apres={r.recharger} />}
+      {q.acceptation_retiree && (
+        <p role="status" className="border-2 border-ink bg-orange/15 p-4">
+          L&apos;acceptation en ligne n&apos;est pas activée pour votre compte. Contactez votre conseiller Seritex pour valider ce devis.
+        </p>
+      )}
       {q.expire_le_jour && (
         <p role="status" className="border-2 border-ink bg-orange/15 p-4">
           Ce devis n&apos;est plus valable. Contactez-nous à info@seritex.ci pour en obtenir un nouveau.

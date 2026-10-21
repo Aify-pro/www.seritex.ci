@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { formatDateFr, formatMontant, STATUT_DEVIS, type DevisResume } from "@/lib/espace-client-types";
-import { Chargement, Ecran, Message, Pastille } from "./ecran";
+import { Chargement, Ecran, Message, Pastille, Interdit } from "./ecran";
 import { useDonnees } from "./use-donnees";
 
 function Liste() {
   const r = useDonnees<{ devis: DevisResume[] }>("/api/espace-client/devis");
   if (r.statut === "charge") return <Chargement />;
   if (r.statut === "deconnecte") return <Message alerte>Votre session a expiré. Rechargez la page pour vous reconnecter.</Message>;
+  if (r.statut === "interdit") return <Interdit />;
   if (!r.donnees) return <Message alerte>Impossible de charger vos devis pour le moment. Réessayez dans un instant.</Message>;
   if (r.donnees.devis.length === 0) return <Message>Aucun devis pour le moment. Ils apparaissent ici dès que Seritex vous les envoie.</Message>;
   return (

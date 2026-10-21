@@ -74,6 +74,8 @@ export type DevisDetail = DevisResume & {
   delai: string | null;
   /** Calculé côté serveur : devis envoyé, encore valable. */
   peut_accepter: boolean;
+  /** Le devis serait acceptable, mais ce droit est retiré au compte par Seritex. */
+  acceptation_retiree?: boolean;
   /** Devis envoyé dont la date de validité est dépassée. */
   expire_le_jour: boolean;
 };

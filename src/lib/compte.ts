@@ -14,6 +14,8 @@ import { cookies } from "next/headers";
  * refusé (on ne laisse jamais passer sans identification).
  */
 
+import { DROITS, type Droits } from "@/lib/droits";
+
 const AT = "sx_at";
 const RT = "sx_rt";
 
@@ -27,6 +29,8 @@ export type Profil = {
   rattache: boolean;
   /** Nom de la société (ou de la fiche particulier) une fois rattaché. */
   societe: string | null;
+  /** Droits de l'espace client (plateforme, 0140). Absent = non lus : l'affichage reste permissif, la base décide. */
+  droits?: Droits;
 };
 
 type ErreurAuth = { status: number; code: string };
@@ -118,9 +122,28 @@ export async function creerProfil(u: { id: string; email: string; nom: string; t
   return !!res?.ok;
 }
 
+/** Droits effectifs du client, lus AVEC SA SESSION (client_droits_effectifs) ; null si illisibles. */
+async function droitsDe(jeton: string): Promise<Droits | null> {
+  try {
+    const res = await fetch(`${base()}/rest/v1/rpc/client_droits_effectifs`, {
+      method: "POST",
+      headers: { apikey: anon()!, Authorization: `Bearer ${jeton}`, "Content-Type": "application/json" },
+      body: "{}",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const lignes = (await res.json()) as { droit: string; autorise: boolean }[];
+    if (!Array.isArray(lignes) || lignes.length === 0) return null;
+    const droits = Object.fromEntries(DROITS.map((d) => [d, lignes.find((l) => l.droit === d)?.autorise !== false])) as Droits;
+    return droits;
+  } catch {
+    return null;
+  }
+}
+
 type LigneProfil = { id: string; email: string; full_name: string; phone: string | null; entreprise_declaree: string | null; company_id: string | null };
 
-async function profilDe(u: UtilisateurAuth): Promise<Profil | null> {
+async function profilDe(u: UtilisateurAuth, jeton?: string): Promise<Profil | null> {
   const lire = () => rest<LigneProfil[]>(`app_users?id=eq.${u.id}&select=id,email,full_name,phone,entreprise_declaree,company_id`);
   let l = (await lire())?.[0];
   if (!l) {
@@ -133,7 +156,8 @@ async function profilDe(u: UtilisateurAuth): Promise<Profil | null> {
   }
   if (!l) return null;
   const societe = l.company_id ? ((await rest<{ name: string }[]>(`companies?id=eq.${l.company_id}&select=name`))?.[0]?.name ?? null) : null;
-  return { id: l.id, email: l.email, nom: l.full_name, telephone: l.phone ?? "", entreprise: l.entreprise_declaree ?? "", rattache: !!l.company_id, societe };
+  const droits = jeton && l.company_id ? ((await droitsDe(jeton)) ?? undefined) : undefined;
+  return { id: l.id, email: l.email, nom: l.full_name, telephone: l.phone ?? "", entreprise: l.entreprise_declaree ?? "", rattache: !!l.company_id, societe, droits };
 }
 
 /**
@@ -164,7 +188,7 @@ export async function sessionAvecJeton(): Promise<{ profil: Profil; jeton: strin
     }
   }
   if (!u || !u.ok || !at) return null;
-  const profil = await profilDe(u.data);
+  const profil = await profilDe(u.data, at);
   return profil ? { profil, jeton: at } : null;
 }
 

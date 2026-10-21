@@ -4,17 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
 import type { Profil } from "@/lib/compte";
+import { autorise, type Droit } from "@/lib/droits";
 
 const LIENS = [
   { href: "/espace-client", label: "Mon espace" },
   { href: "/espace-client/demandes", label: "Mes demandes" },
-  { href: "/espace-client/devis", label: "Mes devis" },
-  { href: "/espace-client/commandes", label: "Mes commandes" },
-  { href: "/espace-client/livraisons", label: "Mes livraisons" },
-  { href: "/espace-client/echantillons", label: "Mes échantillons" },
-  { href: "/espace-client/mediatheque", label: "Ma médiathèque" },
+  { href: "/espace-client/devis", label: "Mes devis", droit: "devis_voir" },
+  { href: "/espace-client/commandes", label: "Mes commandes", droit: "commandes_voir" },
+  { href: "/espace-client/livraisons", label: "Mes livraisons", droit: "livraisons_voir" },
+  { href: "/espace-client/echantillons", label: "Mes échantillons", droit: "echantillons_voir" },
+  { href: "/espace-client/mediatheque", label: "Ma médiathèque", droit: "mediatheque_voir" },
   { href: "/espace-client/compte", label: "Mon compte" },
-] as const;
+] as const satisfies readonly { href: string; label: string; droit?: Droit }[];
 
 /** Cadre commun des pages de l'espace client une fois connecté : titre, navigation, déconnexion. */
 export function CadreEspace({ profil, titre, deconnecter, children }: { profil: Profil; titre: string; deconnecter: () => void; children: React.ReactNode }) {
@@ -26,7 +27,7 @@ export function CadreEspace({ profil, titre, deconnecter, children }: { profil: 
       <h1 className="mt-2 font-display text-4xl leading-[0.95] font-black tracking-tighter sm:text-5xl">{titre}</h1>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y-2 border-ink py-3">
         <nav aria-label="Espace client" className="flex flex-wrap gap-2">
-          {LIENS.map((l) => (
+          {LIENS.filter((l) => !("droit" in l) || autorise(profil.droits, l.droit)).map((l) => (
             <Link
               key={l.href}
               href={l.href}

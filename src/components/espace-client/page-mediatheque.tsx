@@ -2,7 +2,7 @@
 
 import { Download } from "lucide-react";
 import { CATEGORIE_FICHIER, formatDateFr, formatTaille, TAILLE_MAX_TELECHARGEMENT, type FichierListe } from "@/lib/espace-client-types";
-import { Chargement, Ecran, Message } from "./ecran";
+import { Chargement, Ecran, Message, Interdit } from "./ecran";
 import { useDonnees } from "./use-donnees";
 
 const ORDRE = ["visuel", "maquette", "image_de_marque", "fiche_technique", "nuancier", "autre"];
@@ -11,6 +11,7 @@ function Liste() {
   const r = useDonnees<{ fichiers: FichierListe[] }>("/api/espace-client/mediatheque");
   if (r.statut === "charge") return <Chargement />;
   if (r.statut === "deconnecte") return <Message alerte>Votre session a expiré. Rechargez la page pour vous reconnecter.</Message>;
+  if (r.statut === "interdit") return <Interdit />;
   if (!r.donnees) return <Message alerte>Impossible de charger votre médiathèque pour le moment. Réessayez dans un instant.</Message>;
   const fichiers = r.donnees.fichiers;
   if (fichiers.length === 0) return <Message>Aucun fichier pour le moment. Vos visuels, votre image de marque et vos fiches techniques apparaissent ici.</Message>;

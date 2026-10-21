@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { formatDateFr, ETAT_LIVRAISON, type LivraisonDetail } from "@/lib/espace-client-types";
-import { Chargement, Ecran, Message, Pastille } from "./ecran";
+import { Chargement, Ecran, Message, Pastille, Interdit } from "./ecran";
 import { useDonnees } from "./use-donnees";
 
 const bloc = "border-2 border-ink bg-paper p-5 shadow-hard-sm";
@@ -13,6 +13,7 @@ function Detail({ id }: { id: string }) {
   if (r.statut === "charge") return <Chargement />;
   if (r.statut === "introuvable") return <Message>Cette livraison est introuvable.</Message>;
   if (r.statut === "deconnecte") return <Message alerte>Votre session a expiré. Rechargez la page pour vous reconnecter.</Message>;
+  if (r.statut === "interdit") return <Interdit />;
   if (!r.donnees) return <Message alerte>Impossible de charger cette livraison pour le moment.</Message>;
   const l = r.donnees.livraison;
   return (
