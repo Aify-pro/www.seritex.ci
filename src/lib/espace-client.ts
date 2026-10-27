@@ -2,7 +2,7 @@ import type { Profil } from "@/lib/compte";
 import { sessionAvecJeton } from "@/lib/compte";
 import { autorise, type Droit } from "@/lib/droits";
 import type { ArticleResume, CommandeListe, FichierListe, DemandeDetail, DemandeListe, DevisDetail, DevisResume, Echange, EchantillonListe, LigneDevis, LivraisonDetail, LivraisonListe } from "./espace-client-types";
-import { libelleDelai } from "./espace-client-types";
+import { COMMENTAIRE_ECHANTILLON_MAX, libelleDelai } from "./espace-client-types";
 
 /**
  * Lecture des données du client connecté. On parle à la base AVEC SA SESSION (jeton du
@@ -266,11 +266,14 @@ export async function detailLivraison(jeton: string, id: string): Promise<Livrai
   };
 }
 
-type LigneEchantillon = { id: string; reference: string; sample_number: string | null; need_description: string; status: string; due_date: string | null; created_at: string; request_id: string | null };
+type LigneEchantillon = { id: string; reference: string; sample_number: string | null; need_description: string; status: string; due_date: string | null; created_at: string; request_id: string | null; validation_client_le: string | null };
+
+/** États où l'échantillon est entre les mains du client : c'est à lui de se prononcer. */
+const ETATS_A_VALIDER = ["envoye", "recu_client", "en_validation"];
 
 export async function listerEchantillons(jeton: string): Promise<EchantillonListe[] | null> {
   // Colonnes nommées : jamais les commentaires de la direction ni les notes.
-  const r = await lire<LigneEchantillon[]>(jeton, "sample_requests?select=id,reference,sample_number,need_description,status,due_date,created_at,request_id&order=created_at.desc&limit=200");
+  const r = await lire<LigneEchantillon[]>(jeton, "sample_requests?select=id,reference,sample_number,need_description,status,due_date,created_at,request_id,validation_client_le&order=created_at.desc&limit=200");
   if (!r) return null;
   const ids = [...new Set(r.map((e) => e.request_id).filter((v): v is string => !!v))];
   const demandes = ids.length ? await lire<{ id: string; reference: string }[]>(jeton, `requests?id=in.(${ids.join(",")})&select=id,reference`) : [];
@@ -278,7 +281,32 @@ export async function listerEchantillons(jeton: string): Promise<EchantillonList
   return r.map((e) => ({
     id: e.id, reference: e.reference, numero: e.sample_number, besoin: e.need_description, statut: e.status, echeance: e.due_date, date: e.created_at,
     demande: e.request_id && refDe.has(e.request_id) ? { id: e.request_id, reference: refDe.get(e.request_id)! } : null,
+    peut_repondre: ETATS_A_VALIDER.includes(e.status) && !e.validation_client_le,
+    validee_le: e.validation_client_le,
   }));
+}
+
+export type ReponseEchantillon = "valide" | "a_ajuster" | "refuse";
+
+/**
+ * Réponse du client sur un échantillon : « je valide », « à ajuster » ou « refusé ». La décision est celle de la base
+ * (valider_echantillon / refuser_echantillon : société du client, fiche non close, une seule validation) ; la direction
+ * pose sa propre validation de son côté. Un ajustement ou un refus exige un message : c'est ce que l'atelier lira.
+ */
+export async function repondreEchantillon(jeton: string, id: string, reponse: ReponseEchantillon, commentaire: string): Promise<ResultatAction> {
+  const texte = commentaire.trim().slice(0, COMMENTAIRE_ECHANTILLON_MAX);
+  if (reponse !== "valide" && texte.length < 3) return { ok: false, code: "invalide", message: "Dites-nous en quelques mots ce qu'il faut ajuster." };
+  const fiche = (await lire<{ id: string; status: string; validation_client_le: string | null }[]>(jeton, `sample_requests?id=eq.${id}&select=id,status,validation_client_le`))?.[0];
+  if (!fiche) return { ok: false, code: "introuvable", message: "Cet échantillon est introuvable." };
+  if (fiche.validation_client_le) return { ok: false, code: "indisponible", message: "Vous avez déjà validé cet échantillon." };
+  if (!ETATS_A_VALIDER.includes(fiche.status)) return { ok: false, code: "indisponible", message: "Cet échantillon ne peut pas être validé pour le moment." };
+  const r =
+    reponse === "valide"
+      ? await ecrire(jeton, "rpc/valider_echantillon", { p_sample_request_id: id, p_partie: "client", p_commentaire: texte || null })
+      : await ecrire(jeton, "rpc/refuser_echantillon", { p_sample_request_id: id, p_decision: reponse, p_commentaire: texte });
+  if (r.ok) return r;
+  if (/déjà|close/.test(r.message)) return { ok: false, code: "indisponible", message: "Cet échantillon a déjà été traité." };
+  return { ok: false, code: "erreur", message: "Votre réponse n'a pas pu être enregistrée. Rien n'a été modifié : réessayez ou contactez-nous." };
 }
 
 // ---------------------------------------------------------------------------

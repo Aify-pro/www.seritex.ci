@@ -178,7 +178,14 @@ export type EchantillonListe = {
   echeance: string | null;
   date: string;
   demande: { id: string; reference: string } | null;
+  /** Le client attend de répondre : l'échantillon lui est parvenu et sa validation n'est pas posée. */
+  peut_repondre: boolean;
+  /** Date à laquelle le client a validé (la direction valide de son côté). */
+  validee_le: string | null;
 };
+
+/** Longueur maximale du message joint à une réponse sur un échantillon. */
+export const COMMENTAIRE_ECHANTILLON_MAX = 2000;
 
 export const CATEGORIE_FICHIER: Record<string, string> = {
   visuel: "Visuels",

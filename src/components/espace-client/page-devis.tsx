@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { formatDateFr, formatMontant, STATUT_DEVIS, type DevisDetail } from "@/lib/espace-client-types";
 import { Chargement, Ecran, Message, Pastille, Interdit } from "./ecran";
 import { AccepterDevis } from "./accepter-devis";
@@ -26,6 +26,13 @@ function Detail({ id }: { id: string }) {
         <p className="font-display text-2xl font-black">{q.reference}</p>
         <Pastille statut={q.statut} libelles={STATUT_DEVIS} />
         <span className="text-sm text-muted">Émis le {formatDateFr(q.date)}</span>
+        <a
+          href={`/api/espace-client/devis/${q.id}/pdf`}
+          download
+          className="inline-flex min-h-11 items-center gap-2 border-2 border-ink bg-orange px-4 font-display text-sm font-bold shadow-hard-sm sm:ml-auto"
+        >
+          <Download aria-hidden size={16} /> Télécharger la proforma (PDF)
+        </a>
       </div>
       {(q.objet || q.reference_client || q.demande) && (
         <p className="text-muted">
