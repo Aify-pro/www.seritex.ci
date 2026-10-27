@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { formatDateFr, STATUT_ECHANTILLON, type EchantillonListe } from "@/lib/espace-client-types";
 import { Chargement, Ecran, Message, Pastille, Interdit } from "./ecran";
+import { RepondreEchantillon } from "./repondre-echantillon";
 import { useDonnees } from "./use-donnees";
 
 function Liste() {
@@ -31,8 +32,12 @@ function Liste() {
               </>
             ) : null}
           </p>
-          {e.statut === "envoye" || e.statut === "recu_client" || e.statut === "en_validation" ? (
-            <p className="mt-2 text-sm">Votre avis sur cet échantillon nous aide : écrivez à votre conseiller depuis la demande liée, ou à info@seritex.ci.</p>
+          {e.peut_repondre ? (
+            <RepondreEchantillon echantillon={e} apres={r.recharger} />
+          ) : e.validee_le ? (
+            <p role="status" className="mt-2 text-sm">
+              Vous avez validé cet échantillon le {formatDateFr(e.validee_le)}. La validation de la direction Seritex suit, puis nous lançons la fabrication.
+            </p>
           ) : null}
         </li>
       ))}
